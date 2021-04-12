@@ -6,6 +6,7 @@ import random
 from pathlib import Path
 import sklearn
 from sklearn.ensemble import RandomForestRegressor
+from sklearn.linear_model import BayesianRidge
 import sklearn.utils._cython_blas
 import sklearn.neighbors._typedefs
 import sklearn.tree
@@ -13,6 +14,9 @@ import sklearn.tree._utils
 import xlsxwriter
 import platform
 import time
+from sklearn.svm import SVR
+from sklearn.decomposition import KernelPCA
+from sklearn.neighbors import KNeighborsRegressor
 
 path = Path('./')
 
@@ -170,9 +174,7 @@ def plot(y, mode='scatter',  **kwargs):
 
 
 def crossPlot(x, y, **kwargs):
-    plt.xlabel('CBR池B-DO')
-    plt.ylabel('CLF:TPr')
-
+    
     T = []
     for t, v in x:
         if t in [y[0] for y in y]:
@@ -366,7 +368,10 @@ def strategy(trX, thresholds=None, typeDefs=None, safety=0.7):
     XY = trX[xyinds, :, 1].T
     Z = trX[zinds, :, 1].T
     
-    model = [RandomForestRegressor(criterion='mae').fit(XY, z) for z in Z.T]
+    #model = [RandomForestRegressor(criterion='mae').fit(XY, z) for z in Z.T]
+    
+    model = [KNeighborsRegressor().fit(XY, z) for z in Z.T]
+    
     T = lambda xy: np.array([regr.predict(xy) for regr in model]).T
     
     THR = np.array([[[float(thresh.replace('q', '').replace("%", ''))/100, threshold[thresh]] for thresh in threshold] for threshold in thresholds])
@@ -383,7 +388,9 @@ def strategy(trX, thresholds=None, typeDefs=None, safety=0.7):
     def L(X, Y, safety):
         return (1 - safety) * J(Y) + safety * R(T([[*(X[i][xinds]), *y] for i, y in enumerate(Y)])) + 0.0001
     
-    lossModel = RandomForestRegressor(criterion='mae').fit([[*(X[i][xinds]), *y] for i, y in enumerate(Y)], L(X, Y, safety=safety))
+    #lossModel = RandomForestRegressor(criterion='mae').fit([[*(X[i][xinds]), *y] for i, y in enumerate(Y)], L(X, Y, safety=safety))
+    
+    lossModel = KNeighborsRegressor().fit([[*(X[i][xinds]), *y] for i, y in enumerate(Y)], L(X, Y, safety=safety))
     
     def localLoss(x):
         xin = [[*(np.multiply(x, np.ones(Y.shape))[i][xinds]), *y] for i, y in enumerate(Y)]
@@ -399,7 +406,10 @@ def strategy(trX, thresholds=None, typeDefs=None, safety=0.7):
 
     X1,Y1 = np.array(X[rinds]), np.array(Y1)
 
-    strat = [RandomForestRegressor(criterion='mae').fit(X1, y) for y in Y1.T]
+    # strat = [RandomForestRegressor(criterion='mae').fit(X1, y) for y in Y1.T]
+    
+    strat = [KNeighborsRegressor().fit(X1, y) for y in Y1.T]
+    
     S = lambda x: np.array([regr.predict(x) for regr in strat]).T
     
     return S, T
@@ -614,9 +624,14 @@ class analysis:
         self.train()
         
     def train(self):  # opt 机器
-        strat = [RandomForestRegressor(criterion='mae').fit(self.X, y) for y in self.Y.T]
+        # strat = [RandomForestRegressor(criterion='mae').fit(self.X, y) for y in self.Y.T]
+        
+        strat = [KNeighborsRegressor().fit(self.X, y) for y in self.Y.T]
+        
         self.S_hm = lambda x: np.array([regr.predict(x) for regr in strat]).T
-
+        
+        
+        
         self.S, self.T = strategy(self.trX, thresholds=self.thresholds, typeDefs=self.typeDefs, safety=self.safety)
         self.Yopt, self.Zopt, consumptions, risks = efficacy(self.trX, strat=self.S, T=self.T, typeDefs=self.typeDefs, thresholds=self.thresholds, startIndex=self.startIndex, endIndex=self.endIndex, verbose=self.verbose)
         
@@ -646,7 +661,8 @@ class analysis:
 
 
 if __name__ == '__main__':
-
+    plt.style.use('dark_background')
+    
     data = readJsonData('/web/juno/juno/Juno8/JunoProject/Sheng-3.1/value.json')
     
     # inputVars = ['二沉池混合后-TP', '二沉池混合后-SS']
@@ -661,29 +677,35 @@ if __name__ == '__main__':
     # typeDefs = [-1,-1,1, 2]
     
     t1 = time.time()
-    boundaries = range(11, 19)
-    As = []
-    for boundary in boundaries:
-        # thresholds = [{'q99%': 0.35, 'q80%': 0.2}, {'q99%': 9, 'q80%': 7}]
+    # boundaries = range(11, 19)
+    # As = []
+    # for boundary in boundaries:
+    #     # thresholds = [{'q99%': 0.35, 'q80%': 0.2}, {'q99%': 9, 'q80%': 7}]
 
-        # thresholkds= [{q100: 20, q90: 10}, {q95: 40, q85:30}]  (String)
-        thresholds = [{'q99%': 19, 'q80%': boundary}]
+    #     # thresholkds= [{q100: 20, q90: 10}, {q95: 40, q85:30}]  (String)
+    #     thresholds = [{'q99%': 19, 'q80%': boundary}]
 
-        A = analysis(data, inputVars, controlVars, outputVars, thresholds, typeDefs, safety=0, verbose=True)
-        print(A.risks)
-        print(A.consumptions)
-        print('time taken', time.time()-t1)
+    #     A = analysis(data, inputVars, controlVars, outputVars, thresholds, typeDefs, safety=0, verbose=True)
+    #     print(A.risks)
+    #     print(A.consumptions)
+    #     print('time taken', time.time()-t1)
         
-        plt.style.use('dark_background')
+    #     
         
-        As.append(A)
-        # rx = [[0.4, 1.0], [0, np.inf]]
-        # print('region x', dict(zip(inputVars, rx)))
-        # B = A.crf(rx=rx)
-        # print('P(xyz in region x)', B.p)
-    print('time taken', time.time()-t1)
+    #     As.append(A)
+    #     # rx = [[0.4, 1.0], [0, np.inf]]
+    #     # print('region x', dict(zip(inputVars, rx)))
+    #     # B = A.crf(rx=rx)
+    #     # print('P(xyz in region x)', B.p)
+    # print('time taken', time.time()-t1)
     
-    Rs = [A.risks for A in As]
-    Cs = [A.consumptions for A in As]
-    # print(Rs)
-    # print(Cs)
+    # Rs = [A.risks for A in As]
+    # Cs = [A.consumptions for A in As]
+    # # print(Rs)
+    # # print(Cs)
+    
+    thresholds = [{'q99%': 19, 'q80%': 10}]
+    A = analysis(data, inputVars, controlVars, outputVars, thresholds, typeDefs, safety=0.5, verbose=True)
+    print(A.risks)
+    print(A.consumptions)
+    print('time taken', time.time()-t1)
