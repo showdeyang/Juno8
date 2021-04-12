@@ -25,7 +25,12 @@ else:
     newline = '\n'
     encoding = 'gbk'
 
-
+def readJsonData(dataPath):
+    with open(dataPath, 'r') as f:
+        d = json.loads(f.read())
+        
+    dt = {key: [(i, round(float(value), 2)) for i, value in enumerate(d[key]) if value] for key in d}
+    return dt
 # def readData(dataPath):
 #     try:
 #         with open(dataPath, 'r', encoding='gbk') as f:
@@ -119,7 +124,7 @@ def knnRegress(X, maxT=None, n_points=2000, strength=0, locality=16.5):
     T = []
     for x in X:
         T += [r[0] for r in x]
-  
+    #print(T)
     T = list(set(T))
     minT = 0
     if maxT:
@@ -127,7 +132,8 @@ def knnRegress(X, maxT=None, n_points=2000, strength=0, locality=16.5):
     else:
         maxT = int(max(T))
     n_points = min(int(maxT-minT), n_points)    
-    Ts = list(range(minT, maxT+1*int((maxT-minT)/n_points), int((maxT-minT)/n_points)))
+    #print(type(n_points))
+    Ts = [int(v) for v in np.linspace(minT, maxT, n_points+1)]
     trX = []
     for t in Ts:
         trx = []
@@ -640,17 +646,16 @@ class analysis:
 
 
 if __name__ == '__main__':
-    # test_data, logs, pools = readData(path / 'test_data' / 'test_data.csv')
-    with open(path / 'test_data' / 'database' / 'test_data.json') as f:
-        data = json.loads(f.read())
+
+    data = readJsonData('/web/juno/juno/Juno8/JunoProject/Sheng-3.1/value.json')
     
     # inputVars = ['二沉池混合后-TP', '二沉池混合后-SS']
     # controlVars = ['高效澄清池-PAC（投加量）', '高效澄清池-PAM(投加量）']
     # outputVars = ['排放池-TP在线', '高效澄清池-SS']
     
-    inputVars = ['二沉池混合后-TOC', '缺氧池B（D-N）-NO3-N']
-    controlVars = ['高效澄清池-粉炭（投加量）']
-    outputVars = ['高效澄清池-TOC']
+    inputVars = ['二沉池混合后-TOC (mg/L)', '缺氧池B（D-N）-NO3-N (mg/L)']
+    controlVars = ['高效澄清池-粉炭(投加量) (mg/L)']
+    outputVars = ['高效澄清池-TOC (mg/L)']
     # 人工定义  td = [-1, -1, -1, -1, 0.2, 0.3, 0.5, 4, 6] (情况指标全为-1，运行指标全为小数，结果指标全部大于1，各类指标内占比比例不变)
     typeDefs = [-1]*len(inputVars) + [1/len(controlVars)]*len(controlVars) + [2]*len(outputVars)
     # typeDefs = [-1,-1,1, 2]
@@ -667,7 +672,7 @@ if __name__ == '__main__':
         A = analysis(data, inputVars, controlVars, outputVars, thresholds, typeDefs, safety=0, verbose=True)
         print(A.risks)
         print(A.consumptions)
-        # print('time taken', time.time()-t1)
+        print('time taken', time.time()-t1)
         
         plt.style.use('dark_background')
         
@@ -676,7 +681,7 @@ if __name__ == '__main__':
         # print('region x', dict(zip(inputVars, rx)))
         # B = A.crf(rx=rx)
         # print('P(xyz in region x)', B.p)
-    # print('time taken', time.time()-t1)
+    print('time taken', time.time()-t1)
     
     Rs = [A.risks for A in As]
     Cs = [A.consumptions for A in As]

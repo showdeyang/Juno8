@@ -958,7 +958,7 @@ class JunoUI(object):
 
         self.config_save(project_name, task_name)
 
-        result = algo.analysis(values, self.config_data['situation'], self.config_data['action'], self.config_data['result'], datas, typedefs, safety=0.975, verbose=True)
+        result = algo.analysis(values, self.config_data['situation'], self.config_data['action'], self.config_data['result'], datas, typedefs, safety=0.5, verbose=True)
 
         self.result_window(juno, result, project_name, task_name)
 
@@ -1228,16 +1228,27 @@ class JunoUI(object):
         for i in result.Y:
             y_hm.append(i[index])
         y_hm = np.array(y_hm)
-        y_hm, x_hm = np.histogram(y_hm)
-        y_hm = y_hm / np.sum(y_hm)
-        self.plt1.plot(x_hm, y_hm, stepMode='center', fillLevel=0, fillOutLine=False, brush=(255, 0, 0, 150), name='人')
+        y_hm, x_hm = np.histogram(y_hm, bins=20)
+        
+        #y_hm = y_hm /(1.2*np.max(y_hm))
+        
 
         y_ai = []
         for i in result.Yopt:
             y_ai.append(i[index])
         y_ai = np.array(y_ai)
-        y_ai, x_ai = np.histogram(y_ai)
-        y_ai = y_ai / np.sum(y_ai)
+        y_ai, x_ai = np.histogram(y_ai, bins=20)
+        #y_ai = y_ai /np.max(y_ai)
+        
+        dx = (np.percentile(x_hm, 75) - np.percentile(x_hm,25)) /  (np.percentile(x_ai, 75) - np.percentile(x_ai,25))
+        y_hm = y_hm /(dx*np.percentile(y_hm, 100))
+        y_ai = y_ai /np.max(y_ai)
+        
+        print('y_hm', np.array(y_hm).shape, y_hm, sum(y_hm), x_hm)
+        print('y_ai', np.array(y_ai).shape, y_ai, sum(y_ai), x_ai)
+        
+        self.plt1.plot(x_hm, y_hm, stepMode='center', fillLevel=0, fillOutLine=False, brush=(255, 0, 0, 150), name='人')
+        
         self.plt1.plot(x_ai, y_ai, stepMode='center', fillLevel=0, fillOutLine=False, brush=(0, 255, 0, 150), name='AI')
 
     def graph2_combo_change(self, result):
@@ -1260,12 +1271,12 @@ class JunoUI(object):
         for i in result.Yopt:
             y_ai.append(i[index_y])
 
-        scatter_hm = pyqtgraph.ScatterPlotItem(size=5, brush=pyqtgraph.mkBrush(255, 0, 0, 80))
-        scatter_hm.setData(pos=zip(x, y_hm), alpha=0.5, name='人')
+        scatter_hm = pyqtgraph.ScatterPlotItem(size=5, brush=pyqtgraph.mkBrush(255, 0, 0, 100))
+        scatter_hm.setData(pos=zip(x, y_hm), alpha=0.3, name='人')
         self.graph2.addItem(scatter_hm)
 
-        scatter_ai = pyqtgraph.ScatterPlotItem(size=5, brush=pyqtgraph.mkBrush(0, 255, 0, 80))
-        scatter_ai.setData(pos=zip(x, y_ai), alpha=0.5, name='AI')
+        scatter_ai = pyqtgraph.ScatterPlotItem(size=5, brush=pyqtgraph.mkBrush(0, 0, 255, 100))
+        scatter_ai.setData(pos=zip(x, y_ai), alpha=0.8, name='AI')
         self.graph2.addItem(scatter_ai)
 
     def load_table3(self, result):
