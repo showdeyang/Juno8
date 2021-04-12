@@ -33,7 +33,7 @@ def readJsonData(dataPath):
     with open(dataPath, 'r') as f:
         d = json.loads(f.read())
         
-    dt = {key: [(i, round(float(value), 2)) for i, value in enumerate(d[key]) if value] for key in d}
+    dt = {key: [(i, float(value)) for i, value in enumerate(d[key]) if value] for key in d}
     return dt
 # def readData(dataPath):
 #     try:
@@ -663,7 +663,7 @@ class analysis:
 if __name__ == '__main__':
     plt.style.use('dark_background')
     
-    data = readJsonData('/web/juno/juno/Juno8/JunoProject/Sheng-3.1/value.json')
+    data = readJsonData(path / 'JunoProject' / 'Sheng-3.1' / 'value.json')
     
     # inputVars = ['二沉池混合后-TP', '二沉池混合后-SS']
     # controlVars = ['高效澄清池-PAC（投加量）', '高效澄清池-PAM(投加量）']
