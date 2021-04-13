@@ -17,6 +17,9 @@ import time
 from sklearn.svm import SVR
 from sklearn.decomposition import KernelPCA
 from sklearn.neighbors import KNeighborsRegressor
+from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import Pipeline
+
 
 path = Path('./')
 
@@ -369,8 +372,8 @@ def strategy(trX, thresholds=None, typeDefs=None, safety=0.7):
     Z = trX[zinds, :, 1].T
     
     #model = [RandomForestRegressor(criterion='mae').fit(XY, z) for z in Z.T]
-    
-    model = [KNeighborsRegressor().fit(XY, z) for z in Z.T]
+    pipe = Pipeline([('scaler', StandardScaler()), ('knn', KNeighborsRegressor())])
+    model = [pipe.fit(XY, z) for z in Z.T]
     
     T = lambda xy: np.array([regr.predict(xy) for regr in model]).T
     
@@ -390,7 +393,9 @@ def strategy(trX, thresholds=None, typeDefs=None, safety=0.7):
     
     #lossModel = RandomForestRegressor(criterion='mae').fit([[*(X[i][xinds]), *y] for i, y in enumerate(Y)], L(X, Y, safety=safety))
     
-    lossModel = KNeighborsRegressor().fit([[*(X[i][xinds]), *y] for i, y in enumerate(Y)], L(X, Y, safety=safety))
+    
+    pipe = Pipeline([('scaler', StandardScaler()), ('knn', KNeighborsRegressor())])
+    lossModel = pipe.fit([[*(X[i][xinds]), *y] for i, y in enumerate(Y)], L(X, Y, safety=safety))
     
     def localLoss(x):
         xin = [[*(np.multiply(x, np.ones(Y.shape))[i][xinds]), *y] for i, y in enumerate(Y)]
@@ -408,7 +413,8 @@ def strategy(trX, thresholds=None, typeDefs=None, safety=0.7):
 
     # strat = [RandomForestRegressor(criterion='mae').fit(X1, y) for y in Y1.T]
     
-    strat = [KNeighborsRegressor().fit(X1, y) for y in Y1.T]
+    pipe = Pipeline([('scaler', StandardScaler()), ('knn', KNeighborsRegressor())])
+    strat = [pipe.fit(X1, y) for y in Y1.T]
     
     S = lambda x: np.array([regr.predict(x) for regr in strat]).T
     
