@@ -1,24 +1,22 @@
 import sys
 import os
-from PyQt5 import Qt, QtCore, QtGui
-from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QMenu, QMenuBar, QStatusBar, QPushButton, QLabel, \
-    QComboBox, QTableWidget, QTableWidgetItem, QProgressBar, QFileDialog, QFormLayout, QVBoxLayout, QHBoxLayout, \
-    QGridLayout, QTabWidget, QScrollArea, QSlider, QTextEdit, QDialog, QTextBrowser, QDateEdit, QRadioButton, QCheckBox, \
-    QGroupBox, QSplitter, QHeaderView
-from pathlib import Path
-import platform
+from PyQt5 import QtCore
+from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QPushButton, QLabel, QComboBox, QTableWidget, QTableWidgetItem, QFileDialog, QFormLayout, QVBoxLayout, QHBoxLayout, QTabWidget, QTextEdit, QTextBrowser, QDateEdit, QHeaderView
 from functools import partial
 import xlrd
+import xlsxwriter
 from datetime import date
-import time
 import pyqtgraph
+import pyqtgraph.exporters
 import json
 import numpy as np
 import algo
 
-
+Version = 'Juno 2.1'
 if not os.path.isdir('./JunoProject'):
     os.mkdir('./JunoProject')
+if not os.path.isdir('./SourceTable'):
+    os.mkdir('./SourceTable')
 
 
 class JunoUI(object):
@@ -30,7 +28,7 @@ class JunoUI(object):
         self.filename = ''
 
     def Main_Window(self, juno):
-        juno.setWindowTitle('Juno 2.0 - 项目')
+        juno.setWindowTitle(Version + ' - 项目')
         new_project_btn = QPushButton('新建项目')
         new_project_btn.clicked.connect(partial(self.new_project_window, juno))
 
@@ -69,7 +67,7 @@ class JunoUI(object):
             count += 1
 
     def new_project_window(self, juno):
-        juno.setWindowTitle('Juno 2.0 - 新建项目')
+        juno.setWindowTitle(Version + ' - 新建项目')
         setName_label = QLabel('项目名称:')
         self.inputName = QTextEdit()
         self.inputName.textChanged.connect(self.input_change)
@@ -123,7 +121,8 @@ class JunoUI(object):
         with open('./JunoProject/' + project_name + '/value.json', 'w') as f:
             f.write(json.dumps(self.value_temp))
 
-        self.task_window(project_name, juno)
+        # self.task_window(project_name, juno)
+        self.Main_Window(juno)
 
     def new_project_no(self, juno):
         self.Main_Window(juno)
@@ -295,7 +294,7 @@ class JunoUI(object):
         self.task_window(self.project_table.currentItem().text(), juno)
 
     def task_window(self, project_name, juno):
-        juno.setWindowTitle('Juno 2.0 - 命题')
+        juno.setWindowTitle(Version + ' - 命题')
         label = QLabel('添加命题: ')
         self.task_textedit = QTextEdit()
         self.task_textedit.textChanged.connect(partial(self.task_textedit_change, project_name))
@@ -349,7 +348,7 @@ class JunoUI(object):
 
     def task_submit(self, project_name):
         task_name = self.task_textedit.document().toRawText()
-        var = {'situation': [], 'action': [], 'result': [], 'cost': {}, 'risk': {}, 'border': {}}
+        var = {'situation': [], 'action': [], 'result': [], 'cost': {}, 'risk': {}, 'border': {}, 'begin': None, 'end': None, 'safety': "0.5"}
         with open('./JunoProject/' + project_name + '/Task/' + task_name + '.json', 'w') as f:
             f.write(json.dumps(var))
         self.task_textedit.clear()
@@ -375,7 +374,7 @@ class JunoUI(object):
         self.Main_Window(juno)
 
     def config_window(self, project_name, juno, *task_name_1):
-        juno.setWindowTitle('Juno 2.0 - 配置参数')
+        juno.setWindowTitle(Version + ' - 配置参数')
 
         try:
             task_name = self.task_table.currentItem().text()
@@ -388,11 +387,11 @@ class JunoUI(object):
         self.situation_table = QTableWidget()
         self.situation_table.setColumnCount(2)
         self.situation_table.verticalHeader().setVisible(False)
-        self.situation_table.setHorizontalHeaderLabels(['指标', '删除'])
+        self.situation_table.setHorizontalHeaderLabels(['指标', ''])
         self.situation_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         situation_content = QWidget()
         situation_layout = QFormLayout(situation_content)
-        situation_layout.addRow("情况 ", self.situation_combo)
+        situation_layout.addRow("情况选择 ", self.situation_combo)
         situation_layout.addRow(self.situation_table)
 
         self.action_combo = QComboBox()
@@ -401,11 +400,11 @@ class JunoUI(object):
         self.action_table = QTableWidget()
         self.action_table.setColumnCount(2)
         self.action_table.verticalHeader().setVisible(False)
-        self.action_table.setHorizontalHeaderLabels(['指标', '删除'])
+        self.action_table.setHorizontalHeaderLabels(['指标', ''])
         self.action_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         action_content = QWidget()
         action_layout = QFormLayout(action_content)
-        action_layout.addRow("行为 ", self.action_combo)
+        action_layout.addRow("行为选择 ", self.action_combo)
         action_layout.addRow(self.action_table)
 
         self.result_combo = QComboBox()
@@ -414,11 +413,11 @@ class JunoUI(object):
         self.result_table = QTableWidget()
         self.result_table.setColumnCount(2)
         self.result_table.verticalHeader().setVisible(False)
-        self.result_table.setHorizontalHeaderLabels(['指标', '删除'])
+        self.result_table.setHorizontalHeaderLabels(['指标', ''])
         self.result_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         result_content = QWidget()
         result_layout = QFormLayout(result_content)
-        result_layout.addRow("结果 ", self.result_combo)
+        result_layout.addRow("结果选择 ", self.result_combo)
         result_layout.addRow(self.result_table)
 
         var_content = QWidget()
@@ -427,37 +426,81 @@ class JunoUI(object):
         var_layout.addWidget(action_content)
         var_layout.addWidget(result_content)
 
+        cost_table_label = QLabel('成本占比:\n')
         self.cost_table = QTableWidget()
         self.cost_table.setColumnCount(2)
         self.cost_table.verticalHeader().setVisible(False)
         self.cost_table.setHorizontalHeaderLabels(['行为变量', '成本占比 %'])
         self.cost_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        cost_table_content = QWidget()
+        cost_table_layout = QVBoxLayout(cost_table_content)
+        cost_table_layout.addWidget(cost_table_label)
+        cost_table_layout.addWidget(self.cost_table)
 
         config_content_1 = QWidget()
         config_layout_1 = QHBoxLayout(config_content_1)
         config_layout_1.addWidget(var_content)
-        config_layout_1.addWidget(self.cost_table)
+        config_layout_1.addWidget(cost_table_content)
 
+        risk_table_label = QLabel('重要性占比:\n')
         self.risk_table = QTableWidget()
         self.risk_table.setColumnCount(2)
         self.risk_table.verticalHeader().setVisible(False)
         self.risk_table.setHorizontalHeaderLabels(['结果变量', '重要性占比 %'])
         self.risk_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.risk_table.clicked.connect(self.risk_to_border)
+        risk_table_content = QWidget()
+        risk_table_layout = QVBoxLayout(risk_table_content)
+        risk_table_layout.addWidget(risk_table_label)
+        risk_table_layout.addWidget(self.risk_table)
+
+        border_table_label = QLabel('边界设置:\n')
+        self.border_add_btn = QPushButton('添加边界')
+        self.border_add_btn.clicked.connect(self.border_table_add_row)
+        self.border_add_btn.setDisabled(True)
+        content = QWidget()
+        layout = QHBoxLayout(content)
+        layout.addWidget(border_table_label)
+        layout.addWidget(self.border_add_btn)
         self.border_table = QTableWidget()
         self.border_table.setColumnCount(3)
         self.border_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.border_table.cellChanged.connect(self.borber_table_cell_change)
         self.border_table.verticalHeader().setVisible(False)
         self.border_table.horizontalHeader().setVisible(False)
-        self.border_add_btn = QPushButton('添加边界')
-        self.border_add_btn.clicked.connect(self.border_table_add_row)
-        self.border_add_btn.setDisabled(True)
+        self.border_table_graph = pyqtgraph.GraphicsLayoutWidget()
+        self.border_table_graph.setBackground('#ffffff')
+        self.border_table_graph_plt = self.border_table_graph.addPlot()
+        border_table_content = QWidget()
+        border_table_layout = QVBoxLayout(border_table_content)
+        border_table_layout.addWidget(content)
+        border_table_layout.addWidget(self.border_table)
+        border_table_layout.addWidget(self.border_table_graph)
+
         config_content_2 = QWidget()
         config_layout_2 = QHBoxLayout(config_content_2)
-        config_layout_2.addWidget(self.risk_table)
-        config_layout_2.addWidget(self.border_table)
-        config_layout_2.addWidget(self.border_add_btn)
+        config_layout_2.addWidget(risk_table_content)
+        config_layout_2.addWidget(border_table_content)
+
+        begin_label = QLabel('起始时间')
+        self.date_begin = QDateEdit()
+        self.date_begin.setCalendarPopup(True)
+        self.date_begin.setDate(date.fromordinal(int(float(min(self.value['日期']))) + date(1900, 1, 1).toordinal() - 2))
+        end_label = QLabel('结束时间')
+        self.date_end = QDateEdit()
+        self.date_end.setCalendarPopup(True)
+        self.date_end.setDate(date.fromordinal(int(float(max(self.value['日期']))) + date(1900, 1, 1).toordinal() - 2))
+        label = QLabel('safety')
+        self.safety_textedit = QTextEdit('0.5')
+        content_1 = QWidget()
+        content_1.setFixedHeight(42)
+        layout_1 = QHBoxLayout(content_1)
+        layout_1.addWidget(begin_label)
+        layout_1.addWidget(self.date_begin)
+        layout_1.addWidget(end_label)
+        layout_1.addWidget(self.date_end)
+        layout_1.addWidget(label)
+        layout_1.addWidget(self.safety_textedit)
 
         back_btn = QPushButton('返回')
         back_btn.clicked.connect(partial(self.config_back, project_name, juno))
@@ -478,6 +521,7 @@ class JunoUI(object):
         config_layout = QVBoxLayout(config_content)
         config_layout.addWidget(config_content_1)
         config_layout.addWidget(config_content_2)
+        config_layout.addWidget(content_1)
         config_layout.addWidget(flow_content)
 
         juno.setCentralWidget(config_content)
@@ -494,6 +538,9 @@ class JunoUI(object):
             self.cost_data = self.config_data['cost']                   # 指向 json 指定部分内容的指针
             self.risk_data = self.config_data['risk']                   # 指向 json 指定部分内容的指针
             self.border_data = self.config_data['border']               # 指向 json 指定部分内容的指针
+            self.begin_data = self.config_data['begin']
+            self.end_data = self.config_data['end']
+            self.safety_data = self.config_data['safety']
 
         for i in self.situation_data:
             self.situation_combo.setCurrentText(i)
@@ -504,6 +551,13 @@ class JunoUI(object):
         for i in self.result_data:
             self.result_combo.setCurrentText(i)
             self.result_combo_change()
+
+        if self.begin_data is not None:
+            self.date_begin.setDate(date.fromordinal(int(float(self.begin_data)) + date(1900, 1, 1).toordinal() - 2))
+        if self.end_data is not None:
+            self.date_end.setDate(date.fromordinal(int(float(self.end_data)) + date(1900, 1, 1).toordinal() - 2))
+        if self.safety_data is not None:
+            self.safety_textedit.setText(self.safety_data)
 
     def situation_combo_change(self):
         situation_current = self.situation_combo.currentText()
@@ -599,9 +653,6 @@ class JunoUI(object):
         item.setTextAlignment(QtCore.Qt.AlignCenter)
         self.cost_table.setItem(self.cost_table.rowCount() - 1, 1, item)
 
-        # for i in range(self.cost_table.rowCount()):
-        #     item = QTableWidgetItem(format(100.0 / self.cost_table.rowCount(), '.2f'))
-        #     self.cost_table.setItem(i, 1, item)
         if action_current in self.cost_data:
             count = 0
             for i in self.action_data:
@@ -617,9 +668,6 @@ class JunoUI(object):
         self.action_table.removeRow(index)
 
         self.cost_table.removeRow(index)
-        # for i in range(self.cost_table.rowCount()):
-        #     item = QTableWidgetItem(format(100.0 / self.cost_table.rowCount(), '.2f'))
-        #     self.cost_table.setItem(i, 1, item)
 
         count = 1
         for i in self.value.keys():
@@ -686,10 +734,6 @@ class JunoUI(object):
         item.setTextAlignment(QtCore.Qt.AlignCenter)
         self.risk_table.setItem(self.risk_table.rowCount() - 1, 1, item)
 
-        # for i in range(self.risk_table.rowCount()):
-        #     item = QTableWidgetItem(format(100.0 / self.risk_table.rowCount(), '.2f'))
-        #     self.risk_table.setItem(i, 1, item)
-
         if result_current in self.risk_data:
             count = 0
             for i in self.risk_data:
@@ -705,9 +749,6 @@ class JunoUI(object):
         self.result_table.removeRow(index)
 
         self.risk_table.removeRow(index)
-        # for i in range(self.risk_table.rowCount()):
-        #     item = QTableWidgetItem(format(100.0 / self.risk_table.rowCount(), '.2f'))
-        #     self.risk_table.setItem(i, 1, item)
 
         count = 1
         for i in self.value.keys():
@@ -747,12 +788,24 @@ class JunoUI(object):
                 self.border_add_btn.setDisabled(True)
 
     def risk_to_border(self):
+        row_count = self.risk_table.currentRow()
+        border_name = self.risk_table.item(row_count, 0).text()
+
+        self.border_table_graph_plt.clear()
+        self.border_table_graph_plt.addLegend(brush=(255, 255, 255, 120), labelTextColor='555', pen={'color': "ccc", 'width': 1})
+        border_data = self.value[border_name]
+        border_data_1 = []
+        for i in border_data:
+            if i != '':
+                border_data_1.append(float(i))
+        border_data_1 = np.array(border_data_1)
+        y, x = np.histogram(border_data_1, bins=30)
+        self.border_table_graph_plt.plot(x, y, stepMode='center', fillLevel=0, fillOutLine=False, brush=(161, 164, 167, 255), name='人')
+
         if self.risk_table.currentColumn() == 1:
             return
 
         self.border_add_btn.setDisabled(False)
-        row_count = self.risk_table.currentRow()
-        border_name = self.risk_table.item(row_count, 0).text()
         if border_name not in self.border_data:
             self.border_table.clear()
             self.border_table.setRowCount(1)
@@ -760,7 +813,7 @@ class JunoUI(object):
             item.setFlags(QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled)
             item.setTextAlignment(QtCore.Qt.AlignCenter)
             self.border_table.setItem(0, 0, item)
-            item = QTableWidgetItem(border_name + '--边界')
+            item = QTableWidgetItem(border_name + '--边界 (值不要相同)')
             item.setFlags(QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled)
             item.setTextAlignment(QtCore.Qt.AlignCenter)
             self.border_table.setItem(0, 1, item)
@@ -777,7 +830,7 @@ class JunoUI(object):
         item.setFlags(QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled)
         item.setTextAlignment(QtCore.Qt.AlignCenter)
         self.border_table.setItem(0, 0, item)
-        item = QTableWidgetItem(border_name + '--边界')
+        item = QTableWidgetItem(border_name + '--边界 (值不要相同)')
         item.setFlags(QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled)
         item.setTextAlignment(QtCore.Qt.AlignCenter)
         self.border_table.setItem(0, 1, item)
@@ -899,12 +952,23 @@ class JunoUI(object):
                 risk_temp.update({risk_name: risk_value})
         self.config_data.update({'risk': risk_temp})
 
+        begin_tuple = self.date_begin.date().getDate()
+        end_tuple = self.date_end.date().getDate()
+        Begin_datestamp = date(begin_tuple[0], begin_tuple[1], begin_tuple[2]).toordinal() - date(1900, 1, 1).toordinal() + 2
+        End_datestamp = date(end_tuple[0], end_tuple[1], end_tuple[2]).toordinal() - date(1900, 1, 1).toordinal() + 2
+        safety = self.safety_textedit.document().toRawText()
+        self.config_data.update({'begin': Begin_datestamp})
+        self.config_data.update({'end': End_datestamp})
+        self.config_data.update({'safety': safety})
+
         with open('./JunoProject/' + project_name + '/Task/' + task_name + '.json', 'w') as f:
             f.write(json.dumps(self.config_data))
 
         print(self.config_data)
 
     def config_calc(self, juno, project_name, task_name):
+        self.config_save(project_name, task_name)
+
         value = self.value.copy()
         riqi = value['日期']
         riqi_temp = []
@@ -933,12 +997,12 @@ class JunoUI(object):
                 datas.append(data)
             values.update({i: datas})
 
-        datas = []
+        border = []
         for i in self.config_data['border']:
             data = {}
             for j in self.config_data['border'][i]:
                 data.update({j: float(self.config_data['border'][i][j])})
-            datas.append(data)
+            border.append(data)
 
         typedefs = []
         for i in range(len(self.config_data['situation'])):
@@ -948,27 +1012,22 @@ class JunoUI(object):
         for i in self.config_data['risk']:
             typedefs.append(float(self.config_data['risk'][i]) / 10.0)
 
-        # typedefs = [-1] * len(inputVars) + [1 / len(controlVars)] * len(controlVars) + [2] * len(outputVars)
-
-        # print(self.config_data['situation'])
-        # print(self.config_data['action'])
-        # print(self.config_data['result'])
-        # print(datas)
-        # print(typedefs)
-
-        self.config_save(project_name, task_name)
-
-        result = algo.analysis(values, self.config_data['situation'], self.config_data['action'], self.config_data['result'], datas, typedefs, safety=0.5, verbose=True)
+        Begin_datestamp = self.config_data['begin']
+        End_datestamp = self.config_data['end']
+        startIndex = float(Begin_datestamp) - float(max(self.value['日期'])) - 1
+        endIndex = float(End_datestamp) - float(max(self.value['日期'])) - 1
+        result = algo.analysis(values, self.config_data['situation'], self.config_data['action'], self.config_data['result'], border, typedefs, safety=float(self.config_data['safety']), startIndex=int(startIndex), endIndex=int(endIndex), verbose=True)
 
         self.result_window(juno, result, project_name, task_name)
 
     def result_window(self, juno, result, project_name, task_name):
-        juno.setWindowTitle('Juno 2.0 - 结果展示')
+        juno.setWindowTitle(Version + ' - 结果展示')
 
         self.table1_label = QLabel('项目: ' + project_name + '\n\n命题: ' + task_name + '\n\n各种边界的AI策略结果\n')
         self.table1 = QTableWidget()
         self.table1.verticalHeader().setVisible(False)
         result_1_content = QWidget()
+        result_1_content.setFixedHeight(400)
         result_1_layout = QVBoxLayout(result_1_content)
         result_1_layout.addWidget(self.table1_label)
         result_1_layout.addWidget(self.table1)
@@ -988,11 +1047,10 @@ class JunoUI(object):
         self.plt1 = self.graph1.addPlot()
         self.graph1_combo = QComboBox()
         self.graph1_combo.activated.connect(partial(self.graph1_combo_change, result))
-        self.graph1_combo.addItems(result.consumptions.keys())
         graph1_combo_y_content = QWidget()
         graph1_combo_y_layout = QFormLayout(graph1_combo_y_content)
         graph1_combo_y_layout.addRow(self.graph1_label)
-        graph1_combo_y_layout.addRow('Y - 行为: ', self.graph1_combo)
+        graph1_combo_y_layout.addRow('横轴: ', self.graph1_combo)
         graph1_combo_y_layout.addRow(self.graph1)
 
         self.graph2_label = QLabel('两色散点图\n')
@@ -1004,15 +1062,13 @@ class JunoUI(object):
         self.graph2.setTitle('关系图', **{'color': '#777', 'size': '9pt', 'justify': 'left'})
         self.graph2_combo_x = QComboBox()
         self.graph2_combo_x.activated.connect(partial(self.graph2_combo_change, result))
-        self.graph2_combo_x.addItems(self.config_data['situation'])
         self.graph2_combo_y = QComboBox()
         self.graph2_combo_y.activated.connect(partial(self.graph2_combo_change, result))
-        self.graph2_combo_y.addItems(result.consumptions.keys())
         graph2_combo_content = QWidget()
         graph2_combo_layout = QFormLayout(graph2_combo_content)
         graph2_combo_layout.addRow(self.graph2_label)
-        graph2_combo_layout.addRow('X - 情况: ', self.graph2_combo_x)
-        graph2_combo_layout.addRow('Y - 行为: ', self.graph2_combo_y)
+        graph2_combo_layout.addRow('纵轴: ', self.graph2_combo_y)
+        graph2_combo_layout.addRow('横轴: ', self.graph2_combo_x)
         graph2_combo_layout.addRow(self.graph2)
 
         self.tab1 = QWidget()
@@ -1022,22 +1078,11 @@ class JunoUI(object):
         result_2_layout.addWidget(graph2_combo_content)
 
         table3_label = QLabel('历史数据人机策略\n')
-        self.date_begin = QDateEdit()
-        self.date_begin.setCalendarPopup(True)
-        # self.date_begin.dateChanged.connect(self.table3_date_change)
-        self.date_end = QDateEdit()
-        self.date_end.setCalendarPopup(True)
-        # self.date_end.dateChanged.connect(self.table3_date_change)
-        date_content = QWidget()
-        date_layout = QHBoxLayout(date_content)
-        date_layout.addWidget(table3_label)
-        date_layout.addWidget(self.date_begin)
-        date_layout.addWidget(self.date_end)
         self.table3 = QTableWidget()
         self.table3.verticalHeader().setVisible(False)
         table3_content = QWidget()
         table3_layout = QVBoxLayout(table3_content)
-        table3_layout.addWidget(date_content)
+        table3_layout.addWidget(table3_label)
         table3_layout.addWidget(self.table3)
         table4_label = QLabel('边界定义\n')
         self.table4 = QTableWidget()
@@ -1075,27 +1120,26 @@ class JunoUI(object):
 
         self.table7 = QTableWidget()
         self.table7.horizontalHeader().setVisible(False)
+        self.table7.cellChanged.connect(partial(self.table7_change, result))
         self.table7_add = QPushButton('添加')
-        self.table7_add.clicked.connect(self.table7_add_btn)
+        self.table7_add.clicked.connect(partial(self.table7_add_btn, result))
         table7_content = QWidget()
         table7_layout = QVBoxLayout(table7_content)
         table7_layout.addWidget(self.table7)
         table7_layout.addWidget(self.table7_add)
 
-        self.forecast_action = QPushButton('预测行为')
-        self.forecast_action.clicked.connect(partial(self.forecast_action_btn, result))
-
         self.table8 = QTableWidget()
         self.table8.horizontalHeader().setVisible(False)
+        self.table8.cellChanged.connect(partial(self.table8_change, result))
         self.table8_add = QPushButton('添加')
-        self.table8_add.clicked.connect(self.table8_add_btn)
+        self.table8_add.clicked.connect(partial(self.table8_add_btn, result))
         table8_content = QWidget()
         table8_layout = QVBoxLayout(table8_content)
         table8_layout.addWidget(self.table8)
         table8_layout.addWidget(self.table8_add)
 
-        self.forecast_result = QPushButton('预测结果')
-        self.forecast_result.clicked.connect(partial(self.forecast_result_btn, result))
+        # self.forecast_result = QPushButton('预测结果')
+        # self.forecast_result.clicked.connect(partial(self.forecast_result_btn, result))
 
         self.table9 = QTableWidget()
         self.table9.horizontalHeader().setVisible(False)
@@ -1103,9 +1147,8 @@ class JunoUI(object):
         self.tab3 = QWidget()
         result_4_layout = QHBoxLayout(self.tab3)
         result_4_layout.addWidget(table7_content)
-        result_4_layout.addWidget(self.forecast_action)
         result_4_layout.addWidget(table8_content)
-        result_4_layout.addWidget(self.forecast_result)
+        # result_4_layout.addWidget(self.forecast_result)
         result_4_layout.addWidget(self.table9)
 
         tabs = QTabWidget()
@@ -1115,12 +1158,22 @@ class JunoUI(object):
 
         back_btn = QPushButton('返回')
         back_btn.clicked.connect(partial(self.result_back_to_config, project_name, task_name, juno))
+        back_btn.setFixedHeight(50)
+        back_btn.setFixedWidth(133)
+        export_btn = QPushButton('导出')
+        export_btn.clicked.connect(partial(self.export_to_excel, project_name, task_name))
+        export_btn.setFixedHeight(50)
+        export_btn.setFixedWidth(133)
+        btn_content = QWidget()
+        btn_layout = QHBoxLayout(btn_content)
+        btn_layout.addWidget(back_btn)
+        btn_layout.addWidget(export_btn)
 
         result_content = QWidget()
         result_layout = QVBoxLayout(result_content)
         result_layout.addWidget(result_1_content)
         result_layout.addWidget(tabs)
-        result_layout.addWidget(back_btn)
+        result_layout.addWidget(btn_content)
 
         juno.setCentralWidget(result_content)
 
@@ -1130,9 +1183,15 @@ class JunoUI(object):
         self.load_table4()
         self.load_table5(result)
         self.load_table6(result)
-        self.load_table7()
+        self.load_table7(result)
         self.load_table8()
         self.load_table9()
+
+        self.load_graph1_combo(result)
+        self.load_graph2_combo(result)
+
+        self.graph1_combo_change(result)
+        self.graph2_combo_change(result)
 
     def result_back_to_config(self, project_name, task_name, juno):
         self.config_window(project_name, juno, task_name)
@@ -1218,65 +1277,143 @@ class JunoUI(object):
 
         self.table2.resizeRowsToContents()
 
+    def load_graph1_combo(self, result):
+        value = []
+        for i in result.consumptions.keys():
+            value.append('行为 - ' + i)
+        for i in result.risks.keys():
+            value.append('结果 - ' + i)
+        self.graph1_combo.addItems(value)
+
+    def load_graph2_combo(self, result):
+        value = []
+        for i in self.config_data['situation']:
+            value.append('情况 - ' + i)
+        for i in result.consumptions.keys():
+            value.append('行为 - ' + i)
+        for i in result.risks.keys():
+            value.append('结果 - ' + i)
+        self.graph2_combo_x.addItems(value)
+        self.graph2_combo_y.addItems(value)
+
     def graph1_combo_change(self, result):
         self.plt1.clear()
         self.plt1.addLegend(brush=(255, 255, 255, 120), labelTextColor='555', pen={'color': "ccc", 'width': 1})
 
-        index = self.config_data['action'].index(self.graph1_combo.currentText())
+        select_text = self.graph1_combo.currentText()
 
-        y_hm = []
-        for i in result.Y:
-            y_hm.append(i[index])
-        y_hm = np.array(y_hm)
-        y_hm, x_hm = np.histogram(y_hm, bins=20)
-        
-        #y_hm = y_hm /(1.2*np.max(y_hm))
-        
+        if '行为' in select_text:
+            select_text = select_text.split(' - ')[1]
+            index = self.config_data['action'].index(select_text)
 
-        y_ai = []
-        for i in result.Yopt:
-            y_ai.append(i[index])
-        y_ai = np.array(y_ai)
-        y_ai, x_ai = np.histogram(y_ai, bins=20)
-        #y_ai = y_ai /np.max(y_ai)
-        
-        dx = (np.percentile(x_hm, 75) - np.percentile(x_hm,25)) /  (np.percentile(x_ai, 75) - np.percentile(x_ai,25))
-        y_hm = y_hm /(dx*np.percentile(y_hm, 100))
-        y_ai = y_ai /np.max(y_ai)
-        
-        print('y_hm', np.array(y_hm).shape, y_hm, sum(y_hm), x_hm)
-        print('y_ai', np.array(y_ai).shape, y_ai, sum(y_ai), x_ai)
-        
-        self.plt1.plot(x_hm, y_hm, stepMode='center', fillLevel=0, fillOutLine=False, brush=(255, 0, 0, 150), name='人')
-        
-        self.plt1.plot(x_ai, y_ai, stepMode='center', fillLevel=0, fillOutLine=False, brush=(0, 255, 0, 150), name='AI')
+            y_hm = []
+            for i in result.Y:
+                y_hm.append(i[index])
+            y_hm = np.array(y_hm)
+            y_hm, x_hm = np.histogram(y_hm, bins=10)
+
+            y_ai = []
+            for i in result.Yopt:
+                y_ai.append(i[index])
+            y_ai = np.array(y_ai)
+            y_ai, x_ai = np.histogram(y_ai, bins=10)
+
+            dx = (np.percentile(x_hm, 75) - np.percentile(x_hm, 25)) / (np.percentile(x_ai, 75) - np.percentile(x_ai, 25))
+            y_hm = y_hm / (dx * np.percentile(y_hm, 100))
+            y_ai = y_ai / np.max(y_ai)
+
+        elif '结果' in select_text:
+            select_text = select_text.split(' - ')[1]
+            index = self.config_data['result'].index(select_text)
+
+            y_hm = []
+            for i in result.Z:
+                y_hm.append(i[index])
+            y_hm = np.array(y_hm)
+            y_hm, x_hm = np.histogram(y_hm, bins=10)
+
+            y_ai = []
+            for i in result.Zopt:
+                y_ai.append(i[index])
+            y_ai = np.array(y_ai)
+            y_ai, x_ai = np.histogram(y_ai, bins=10)
+
+            dx = (np.percentile(x_hm, 75) - np.percentile(x_hm, 25)) / (np.percentile(x_ai, 75) - np.percentile(x_ai, 25))
+            y_hm = y_hm / (dx * np.percentile(y_hm, 100))
+            y_ai = y_ai / np.max(y_ai)
+
+        else:
+            print("graph1_combo_change() 出错啦！")
+            return
+
+        self.plt1.plot(x_hm, y_hm, stepMode='center', fillLevel=0, fillOutLine=False, brush=(161, 164, 167, 255), name='人 - ' + self.graph1_combo.currentText())
+        self.plt1.plot(x_ai, y_ai, stepMode='center', fillLevel=0, fillOutLine=False, brush=(15, 79, 168, 150), name='AI - ' + self.graph1_combo.currentText())
 
     def graph2_combo_change(self, result):
+
+        x = self.graph2_combo_x.currentText()
+        y = self.graph2_combo_y.currentText()
+
         self.graph2.clear()
-        self.graph2.setTitle(self.graph2_combo_x.currentText() + " 和 " + self.graph2_combo_y.currentText() + " 之间的关系")
-        self.graph2.setLabel('left', self.graph2_combo_y.currentText())
-        self.graph2.setLabel('bottom', self.graph2_combo_x.currentText())
+        self.graph2.setTitle(x + " 和 " + y + " 之间的关系")
+        self.graph2.setLabel('left', x)
+        self.graph2.setLabel('bottom', y)
         self.graph2.addLegend(brush=(255, 255, 255, 120), labelTextColor='555', pen={'color': "ccc", 'width': 1})
 
-        index_x = self.config_data['situation'].index(self.graph2_combo_x.currentText())
-        index_y = self.config_data['action'].index(self.graph2_combo_y.currentText())
+        axis_x_hm = []
+        axis_x_ai = []
+        if '情况' in x:
+            x = x.split(' - ')[1]
+            index_x = self.config_data['situation'].index(x)
+            for i in result.Xhm:
+                axis_x_hm.append(i[index_x])
+            for i in result.Xopt:
+                axis_x_ai.append(i[index_x])
+        elif '行为' in x:
+            x = x.split(' - ')[1]
+            index_x = self.config_data['action'].index(x)
+            for i in result.Yhm:
+                axis_x_hm.append(i[index_x])
+            for i in result.Yopt:
+                axis_x_ai.append(i[index_x])
+        elif '结果' in x:
+            x = x.split(' - ')[1]
+            index_x = self.config_data['result'].index(x)
+            for i in result.Zhm:
+                axis_x_hm.append(i[index_x])
+            for i in result.Zopt:
+                axis_x_ai.append(i[index_x])
 
-        x = []
-        for i in result.X:
-            x.append(i[index_x])
-        y_hm = []
-        for i in result.Y:
-            y_hm.append(i[index_y])
-        y_ai = []
-        for i in result.Yopt:
-            y_ai.append(i[index_y])
+        axis_y_hm = []
+        axis_y_ai = []
+        if '情况' in y:
+            y = y.split(' - ')[1]
+            index_y = self.config_data['situation'].index(y)
+            for i in result.Xhm:
+                axis_y_hm.append(i[index_y])
+            for i in result.Xopt:
+                axis_y_ai.append(i[index_y])
+        elif '行为' in y:
+            y = y.split(' - ')[1]
+            index_y = self.config_data['action'].index(y)
+            for i in result.Yhm:
+                axis_y_hm.append(i[index_y])
+            for i in result.Yopt:
+                axis_y_ai.append(i[index_y])
+        elif '结果' in y:
+            y = y.split(' - ')[1]
+            index_y = self.config_data['result'].index(y)
+            for i in result.Zhm:
+                axis_y_hm.append(i[index_y])
+            for i in result.Zopt:
+                axis_y_ai.append(i[index_y])
 
-        scatter_hm = pyqtgraph.ScatterPlotItem(size=5, brush=pyqtgraph.mkBrush(255, 0, 0, 100))
-        scatter_hm.setData(pos=zip(x, y_hm), alpha=0.3, name='人')
+        scatter_hm = pyqtgraph.ScatterPlotItem(size=5, brush=pyqtgraph.mkBrush(161, 164, 167, 255))
+        scatter_hm.setData(pos=zip(axis_x_hm, axis_y_hm), alpha=0.5, name='人')
         self.graph2.addItem(scatter_hm)
 
-        scatter_ai = pyqtgraph.ScatterPlotItem(size=5, brush=pyqtgraph.mkBrush(0, 0, 255, 100))
-        scatter_ai.setData(pos=zip(x, y_ai), alpha=0.8, name='AI')
+        scatter_ai = pyqtgraph.ScatterPlotItem(size=5, brush=pyqtgraph.mkBrush(15, 79, 168, 255))
+        scatter_ai.setData(pos=zip(axis_x_ai, axis_y_ai), alpha=0.5, name='AI')
         self.graph2.addItem(scatter_ai)
 
     def load_table3(self, result):
@@ -1298,9 +1435,13 @@ class JunoUI(object):
         self.table3.setColumnCount(len(title))
         self.table3.setHorizontalHeaderLabels(title)
 
-        for i in range(len(result.X)):
+        begin_tuple = self.date_begin.date().getDate()
+        Begin_datestamp = date(begin_tuple[0], begin_tuple[1], begin_tuple[2]).toordinal() - date(1900, 1, 1).toordinal() + 2
+        index = self.value['日期'].index(str(float(Begin_datestamp)))
+        values = []
+        for i in range(len(result.Yhm)):
             value = []
-            value.append(date.fromordinal(int(float(self.value['日期'][i]) + date(1900, 1, 1).toordinal() - 2)))
+            value.append(date.fromordinal(int(float(self.value['日期'][i+index]) + date(1900, 1, 1).toordinal() - 2)))
             for j in result.X[i]:
                 value.append(round(j, 2))
             for j in range(len(self.config_data['action'])):
@@ -1309,9 +1450,12 @@ class JunoUI(object):
             for j in range(len(self.config_data['result'])):
                 value.append(round(result.Zhm[i][j], 2))
                 value.append(round(result.Zopt[i][j], 2))
+            values.append(value)
+        values.reverse()
+        for i in values:
             self.table3.setRowCount(self.table3.rowCount() + 1)
             count = 0
-            for j in value:
+            for j in i:
                 item = QTableWidgetItem(str(j))
                 item.setFlags(QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled)
                 item.setTextAlignment(QtCore.Qt.AlignCenter)
@@ -1328,8 +1472,12 @@ class JunoUI(object):
                 border_value.append(j)
         border_value = sorted(border_value, reverse=True)
         title += border_value
-        self.table4.setColumnCount(len(title))
-        self.table4.setHorizontalHeaderLabels(title)
+        title_1 = []
+        for i in title:
+            if i not in title_1:
+                title_1.append(i)
+        self.table4.setColumnCount(len(title_1))
+        self.table4.setHorizontalHeaderLabels(title_1)
 
         count_z = 1
         for i in self.config_data['border']:
@@ -1342,10 +1490,14 @@ class JunoUI(object):
                 else:
                     value.append('')
             count_z += 1
+            value_1 = []
+            for i in value:
+                if i not in value_1:
+                    value_1.append(i)
 
             self.table4.setRowCount(self.table4.rowCount() + 1)
             count = 0
-            for j in value:
+            for j in value_1:
                 item = QTableWidgetItem(str(j))
                 item.setFlags(QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled)
                 item.setTextAlignment(QtCore.Qt.AlignCenter)
@@ -1395,7 +1547,7 @@ class JunoUI(object):
                 self.table6.setItem(self.table6.rowCount() - 1, count, item)
                 count += 1
 
-    def load_table7(self):
+    def load_table7(self, result):
         self.table7.setRowCount(len(self.config_data['situation']) + 2)
         x_title = ['情况变量']
         count_x = 1
@@ -1406,10 +1558,12 @@ class JunoUI(object):
         self.table7.setVerticalHeaderLabels(x_title)
         self.table7.resizeRowsToContents()
 
-    def table7_add_btn(self):
+        self.table7_add_btn(result)
+
+    def table7_add_btn(self, result):
         self.table7.setColumnCount(self.table7.columnCount() + 1)
 
-        item = QTableWidgetItem('自定义输入')
+        item = QTableWidgetItem('自定义输入 - ' + str(self.table7.columnCount()))
         item.setFlags(QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled)
         item.setTextAlignment(QtCore.Qt.AlignCenter)
         self.table7.setItem(0, self.table7.columnCount() - 1, item)
@@ -1420,15 +1574,32 @@ class JunoUI(object):
             self.table7.setItem(i, self.table7.columnCount() - 1, item)
 
         table7_delete_column_btn = QPushButton('删除')
-        table7_delete_column_btn.clicked.connect(self.table7_delete_column_btn)
+        table7_delete_column_btn.clicked.connect(partial(self.table7_delete_column_btn, result))
         self.table7.setCellWidget(self.table7.rowCount() - 1, self.table7.columnCount() - 1, table7_delete_column_btn)
         self.table7.resizeRowsToContents()
+        self.table7.resizeColumnsToContents()
 
-    def table7_delete_column_btn(self):
+    def table7_delete_column_btn(self, result):
         delete_index = self.table7.currentColumn()
         self.table7.removeColumn(delete_index)
+        self.table7_change(result)
 
-    def forecast_action_btn(self, result):
+    def table7_change(self, result):
+        row_count = self.table7.rowCount()
+        column_count = self.table7.columnCount()
+        if row_count == 0 or column_count == 0:
+            self.table8.setColumnCount(0)
+            self.table9.setColumnCount(0)
+            return
+        for i in range(1, row_count - 1):
+            for j in range(column_count):
+                try:
+                    float(self.table7.item(i, j).text())
+                except:
+                    return
+        self.forecast_action(result)
+
+    def forecast_action(self, result):
         rowCount = self.table7.rowCount()
         columnCount = self.table7.columnCount()
         x = []
@@ -1488,10 +1659,10 @@ class JunoUI(object):
         self.table8.setVerticalHeaderLabels(y_title)
         self.table8.resizeRowsToContents()
 
-    def table8_add_btn(self):
+    def table8_add_btn(self, result):
         old_table8_columnCount = 0
         for i in range(self.table8.columnCount()):
-            if self.table8.item(0, i).text() != '自定义输入':
+            if '自定义输入' not in self.table8.item(0, i).text():
                 old_table8_columnCount += 1
         for i in range(self.table8.columnCount() - old_table8_columnCount):
             self.table8.removeColumn(old_table8_columnCount)
@@ -1499,7 +1670,7 @@ class JunoUI(object):
         for i in range(self.table7.columnCount()):
             self.table8.setColumnCount(self.table8.columnCount() + 1)
 
-            item = QTableWidgetItem('自定义输入')
+            item = QTableWidgetItem('自定义输入 - ' + str(self.table8.columnCount() - self.table7.columnCount()*2))
             item.setFlags(QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled)
             item.setTextAlignment(QtCore.Qt.AlignCenter)
             self.table8.setItem(0, self.table8.columnCount() - 1, item)
@@ -1509,15 +1680,29 @@ class JunoUI(object):
                 item.setTextAlignment(QtCore.Qt.AlignCenter)
                 self.table8.setItem(j, self.table8.columnCount() - 1, item)
             table8_delete_column_btn = QPushButton('删除')
-            table8_delete_column_btn.clicked.connect(self.table8_delete_column_btn)
+            table8_delete_column_btn.clicked.connect(partial(self.table8_delete_column_btn, result))
             self.table8.setCellWidget(self.table8.rowCount() - 1, self.table8.columnCount() - 1, table8_delete_column_btn)
             self.table8.resizeRowsToContents()
 
-    def table8_delete_column_btn(self):
-        delete_index = self.table8.currentColumn()
-        self.table8.removeColumn(delete_index)
+    def table8_delete_column_btn(self, result):
+        delete_columns_count = self.table7.columnCount()
+        for i in range(delete_columns_count):
+            self.table8.removeColumn(delete_columns_count*2)
 
-    def forecast_result_btn(self, result):
+        self.table8_change(result)
+
+    def table8_change(self, result):
+        row_count = self.table8.rowCount()
+        column_count = self.table8.columnCount()
+        for i in range(1, row_count - 1):
+            for j in range(column_count):
+                try:
+                    float(self.table8.item(i, j).text())
+                except:
+                    return
+        self.forecast_result(result)
+
+    def forecast_result(self, result):
         rowCount_x = self.table7.rowCount()
         columnCount_x = self.table7.columnCount()
         x = []
@@ -1583,9 +1768,10 @@ class JunoUI(object):
         table8_header = []
         for i in range(self.table8.columnCount()):
             table8_header.append(self.table8.item(0, i).text())
-        if '自定义输入' in table8_header:
+        if '自定义输入 - 1' in table8_header:
+            count_label = 1
             for i in range(self.table7.columnCount()):
-                z2 = ['自定义预测']
+                z2 = ['自定义预测 - ' + str(count_label)]
                 for j in z[0]:
                     z2.append(round(j, 2))
                 z.pop(0)
@@ -1597,6 +1783,7 @@ class JunoUI(object):
                     self.table9.setItem(count_z, count_table9, item)
                     count_z += 1
                 count_table9 += 1
+                count_label += 1
 
         self.table9.resizeRowsToContents()
 
@@ -1609,6 +1796,110 @@ class JunoUI(object):
             count_z += 1
         self.table9.setVerticalHeaderLabels(z_title)
         self.table9.resizeColumnsToContents()
+
+    def export_to_excel(self, project_name, task_name):
+        str = "./JunoProject/" + project_name + "/Output/"
+        if not os.path.isdir(str):
+            os.makedirs(str)
+
+        pyqtgraph.exporters.ImageExporter(self.plt1).export(fileName="人机策略分布.png")
+        pyqtgraph.exporters.ImageExporter(self.graph2.plotItem).export(fileName="两色散点图.png")
+
+        if task_name + '.xls' in os.listdir(str):
+            os.remove(str + task_name + '.xls')
+
+        xlsx = xlsxwriter.Workbook(str + task_name + '.xlsx')
+
+        table_1 = xlsx.add_worksheet('各种边界的AI策略结果')
+        for i in range(self.table1.columnCount()):
+            data = self.table1.horizontalHeaderItem(i).text()
+            table_1.write(0, i, data)
+        for i in range(self.table1.rowCount()):
+            for j in range(self.table1.columnCount()):
+                data = self.table1.item(i, j).text()
+                try:
+                    data = float(data)
+                except:
+                    pass
+                table_1.write(i + 1, j, data)
+
+        table_2 = xlsx.add_worksheet('边界人机对比结果')
+        for i in range(self.table2.columnCount()):
+            data = self.table2.horizontalHeaderItem(i).text()
+            table_2.write(0, i, data)
+        for i in range(self.table2.rowCount()):
+            for j in range(self.table2.columnCount()):
+                data = self.table2.item(i, j).text()
+                try:
+                    data = float(data)
+                except:
+                    pass
+                table_2.write(i + 1, j, data)
+
+        sheet = xlsx.add_worksheet('人机策略分布')
+        sheet.insert_image('A1', '人机策略分布.png')
+
+        sheet = xlsx.add_worksheet('两色散点图')
+        sheet.insert_image('A1', '两色散点图.png')
+
+        table_3 = xlsx.add_worksheet('历史数据人机策略')
+        for i in range(self.table3.columnCount()):
+            data = self.table3.horizontalHeaderItem(i).text()
+            table_3.write(0, i, data)
+        for i in range(self.table3.rowCount()):
+            for j in range(self.table3.columnCount()):
+                data = self.table3.item(i, j).text()
+                try:
+                    data = float(data)
+                except:
+                    pass
+                table_3.write(i + 1, j, data)
+
+        table_4 = xlsx.add_worksheet('边界定义')
+        for i in range(self.table4.columnCount()):
+            data = self.table4.horizontalHeaderItem(i).text()
+            table_4.write(0, i, data)
+        for i in range(self.table4.rowCount()):
+            for j in range(self.table4.columnCount()):
+                data = self.table4.item(i, j).text()
+                try:
+                    data = float(data)
+                except:
+                    pass
+                table_4.write(i + 1, j, data)
+
+        table_5 = xlsx.add_worksheet('人机策略-成本对比')
+        for i in range(self.table5.columnCount()):
+            data = self.table5.horizontalHeaderItem(i).text()
+            table_5.write(0, i, data)
+        for i in range(self.table5.rowCount()):
+            for j in range(self.table5.columnCount()):
+                data = self.table5.item(i, j).text()
+                try:
+                    data = float(data)
+                except:
+                    pass
+                table_5.write(i + 1, j, data)
+
+        table_6 = xlsx.add_worksheet('人机策略-风险对比')
+        for i in range(self.table6.columnCount()):
+            data = self.table6.horizontalHeaderItem(i).text()
+            table_6.write(0, i, data)
+        for i in range(self.table6.rowCount()):
+            for j in range(self.table6.columnCount()):
+                data = self.table6.item(i, j).text()
+                try:
+                    data = float(data)
+                except:
+                    pass
+                table_6.write(i + 1, j, data)
+
+        xlsx.close()
+
+        if '人机策略分布.png' in os.listdir('./'):
+            os.remove('人机策略分布.png')
+        if '两色散点图.png' in os.listdir('./'):
+            os.remove('两色散点图.png')
 
 
 if __name__ == '__main__':
