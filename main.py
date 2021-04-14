@@ -279,11 +279,26 @@ class JunoUI(object):
         # 二维数据表xy转置成二维list: a天每天记录b种数据 变成 b种数据每种记录a天
         matrix_trans = np.array(matrix).transpose().tolist()
 
+        enumerate_value = list(enumerate(self.value_temp))
+        matrix_trans_temp = []
+        name_filter = []
+        index = -1
+        for a in matrix_trans:
+            index += 1
+            s = ('').join(a).strip()
+            if not s:
+                name_filter.append(enumerate_value[index][1])
+                continue
+            matrix_trans_temp.append(a)
+        print(self.value_temp)
+        for a in name_filter:
+            self.value_temp.pop(a)
+
         # 将转置后的二维list依次填进字典的每种"大名称-小名称 单位"中
         row_count = -1
         for i in self.value_temp:
             row_count += 1
-            value_per_col = matrix_trans[row_count]
+            value_per_col = matrix_trans_temp[row_count]
             self.value_temp.update({i: value_per_col})
 
         self.errorText.setText('文件导入成功!')
@@ -1067,8 +1082,8 @@ class JunoUI(object):
         graph2_combo_content = QWidget()
         graph2_combo_layout = QFormLayout(graph2_combo_content)
         graph2_combo_layout.addRow(self.graph2_label)
-        graph2_combo_layout.addRow('纵轴: ', self.graph2_combo_y)
         graph2_combo_layout.addRow('横轴: ', self.graph2_combo_x)
+        graph2_combo_layout.addRow('纵轴: ', self.graph2_combo_y)
         graph2_combo_layout.addRow(self.graph2)
 
         self.tab1 = QWidget()
@@ -1161,7 +1176,7 @@ class JunoUI(object):
         back_btn.setFixedHeight(50)
         back_btn.setFixedWidth(133)
         export_btn = QPushButton('导出')
-        export_btn.clicked.connect(partial(self.export_to_excel, project_name, task_name))
+        export_btn.clicked.connect(partial(self.export_to_excel, project_name, task_name, result))
         export_btn.setFixedHeight(50)
         export_btn.setFixedWidth(133)
         btn_content = QWidget()
@@ -1278,23 +1293,23 @@ class JunoUI(object):
         self.table2.resizeRowsToContents()
 
     def load_graph1_combo(self, result):
-        value = []
+        self.graph1_combo_value = []
         for i in result.consumptions.keys():
-            value.append('行为 - ' + i)
+            self.graph1_combo_value.append('行为 - ' + i)
         for i in result.risks.keys():
-            value.append('结果 - ' + i)
-        self.graph1_combo.addItems(value)
+            self.graph1_combo_value.append('结果 - ' + i)
+        self.graph1_combo.addItems(self.graph1_combo_value)
 
     def load_graph2_combo(self, result):
-        value = []
+        self.graph2_combo_value = []
         for i in self.config_data['situation']:
-            value.append('情况 - ' + i)
+            self.graph2_combo_value.append('情况 - ' + i)
         for i in result.consumptions.keys():
-            value.append('行为 - ' + i)
+            self.graph2_combo_value.append('行为 - ' + i)
         for i in result.risks.keys():
-            value.append('结果 - ' + i)
-        self.graph2_combo_x.addItems(value)
-        self.graph2_combo_y.addItems(value)
+            self.graph2_combo_value.append('结果 - ' + i)
+        self.graph2_combo_x.addItems(self.graph2_combo_value)
+        self.graph2_combo_y.addItems(self.graph2_combo_value)
 
     def graph1_combo_change(self, result):
         self.plt1.clear()
@@ -1346,7 +1361,7 @@ class JunoUI(object):
             print("graph1_combo_change() 出错啦！")
             return
 
-        self.plt1.plot(x_hm, y_hm, stepMode='center', fillLevel=0, fillOutLine=False, brush=(161, 164, 167, 255), name='人 - ' + self.graph1_combo.currentText())
+        self.plt1.plot(x_hm, y_hm, stepMode='center', fillLevel=0, fillOutLine=False, brush=(161, 164, 167, 150), name='人 - ' + self.graph1_combo.currentText())
         self.plt1.plot(x_ai, y_ai, stepMode='center', fillLevel=0, fillOutLine=False, brush=(15, 79, 168, 150), name='AI - ' + self.graph1_combo.currentText())
 
     def graph2_combo_change(self, result):
@@ -1356,8 +1371,8 @@ class JunoUI(object):
 
         self.graph2.clear()
         self.graph2.setTitle(x + " 和 " + y + " 之间的关系")
-        self.graph2.setLabel('left', x)
-        self.graph2.setLabel('bottom', y)
+        self.graph2.setLabel('left', y)
+        self.graph2.setLabel('bottom', x)
         self.graph2.addLegend(brush=(255, 255, 255, 120), labelTextColor='555', pen={'color': "ccc", 'width': 1})
 
         axis_x_hm = []
@@ -1408,12 +1423,12 @@ class JunoUI(object):
             for i in result.Zopt:
                 axis_y_ai.append(i[index_y])
 
-        scatter_hm = pyqtgraph.ScatterPlotItem(size=5, brush=pyqtgraph.mkBrush(161, 164, 167, 255))
-        scatter_hm.setData(pos=zip(axis_x_hm, axis_y_hm), alpha=0.5, name='人')
+        scatter_hm = pyqtgraph.ScatterPlotItem(size=5, brush=pyqtgraph.mkBrush(161, 164, 167, 50))
+        scatter_hm.setData(pos=zip(axis_x_hm, axis_y_hm), alpha=1, name='人')
         self.graph2.addItem(scatter_hm)
 
-        scatter_ai = pyqtgraph.ScatterPlotItem(size=5, brush=pyqtgraph.mkBrush(15, 79, 168, 255))
-        scatter_ai.setData(pos=zip(axis_x_ai, axis_y_ai), alpha=0.5, name='AI')
+        scatter_ai = pyqtgraph.ScatterPlotItem(size=7, brush=pyqtgraph.mkBrush(15, 79, 168, 150))
+        scatter_ai.setData(pos=zip(axis_x_ai, axis_y_ai), alpha=1, name='AI')
         self.graph2.addItem(scatter_ai)
 
     def load_table3(self, result):
@@ -1797,23 +1812,46 @@ class JunoUI(object):
         self.table9.setVerticalHeaderLabels(z_title)
         self.table9.resizeColumnsToContents()
 
-    def export_to_excel(self, project_name, task_name):
+    def export_to_excel(self, project_name, task_name, result):
         str = "./JunoProject/" + project_name + "/Output/"
+        str_image_1 = "./JunoProject/" + project_name + "/Output/Image/人机策略分布"
+        str_image_2 = "./JunoProject/" + project_name + "/Output/Image/两色散点图"
         if not os.path.isdir(str):
             os.makedirs(str)
+        if not os.path.isdir(str_image_1):
+            os.makedirs(str_image_1)
+        if not os.path.isdir(str_image_2):
+            os.makedirs(str_image_2)
 
-        pyqtgraph.exporters.ImageExporter(self.plt1).export(fileName="人机策略分布.png")
-        pyqtgraph.exporters.ImageExporter(self.graph2.plotItem).export(fileName="两色散点图.png")
-
-        if task_name + '.xls' in os.listdir(str):
-            os.remove(str + task_name + '.xls')
+        current_graph1_combo = self.graph1_combo.currentText()
+        current_graph2_combo_x = self.graph2_combo_x.currentText()
+        current_graph2_combo_y = self.graph2_combo_y.currentText()
+        for i in self.graph1_combo_value:
+            self.graph1_combo.setCurrentText(i)
+            self.graph1_combo_change(result)
+            a = 'JunoProject/' + project_name + '/Output/Image/两色散点图/' + i.replace(' ', '').replace('/', '') +'.png'
+            pyqtgraph.exporters.ImageExporter(self.plt1).export(fileName=a)
+        for i in self.graph2_combo_value:
+            for j in self.graph2_combo_value:
+                if i != j:
+                    self.graph2_combo_x.setCurrentText(i)
+                    self.graph2_combo_y.setCurrentText(j)
+                    self.graph2_combo_change(result)
+                    a = 'JunoProject/' + project_name + '/Output/Image/人机策略分布/' + i.replace(' ', '').replace('/', '').split('(')[0] + '&' + j.replace(' ', '').replace('/', '').split('(')[0] +'.png'
+                    pyqtgraph.exporters.ImageExporter(self.graph2.plotItem).export(fileName=a)
+        self.graph1_combo.setCurrentText(current_graph1_combo)
+        self.graph1_combo_change(result)
+        self.graph2_combo_x.setCurrentText(current_graph2_combo_x)
+        self.graph2_combo_y.setCurrentText(current_graph2_combo_y)
+        self.graph2_combo_change(result)
 
         xlsx = xlsxwriter.Workbook(str + task_name + '.xlsx')
+        text_format = xlsx.add_format({'text_wrap': 'True'})
 
         table_1 = xlsx.add_worksheet('各种边界的AI策略结果')
         for i in range(self.table1.columnCount()):
             data = self.table1.horizontalHeaderItem(i).text()
-            table_1.write(0, i, data)
+            table_1.write(0, i, data, text_format)
         for i in range(self.table1.rowCount()):
             for j in range(self.table1.columnCount()):
                 data = self.table1.item(i, j).text()
@@ -1821,12 +1859,12 @@ class JunoUI(object):
                     data = float(data)
                 except:
                     pass
-                table_1.write(i + 1, j, data)
+                table_1.write(i + 1, j, data, text_format)
 
         table_2 = xlsx.add_worksheet('边界人机对比结果')
         for i in range(self.table2.columnCount()):
             data = self.table2.horizontalHeaderItem(i).text()
-            table_2.write(0, i, data)
+            table_2.write(0, i, data, text_format)
         for i in range(self.table2.rowCount()):
             for j in range(self.table2.columnCount()):
                 data = self.table2.item(i, j).text()
@@ -1834,18 +1872,12 @@ class JunoUI(object):
                     data = float(data)
                 except:
                     pass
-                table_2.write(i + 1, j, data)
-
-        sheet = xlsx.add_worksheet('人机策略分布')
-        sheet.insert_image('A1', '人机策略分布.png')
-
-        sheet = xlsx.add_worksheet('两色散点图')
-        sheet.insert_image('A1', '两色散点图.png')
+                table_2.write(i + 1, j, data, text_format)
 
         table_3 = xlsx.add_worksheet('历史数据人机策略')
         for i in range(self.table3.columnCount()):
             data = self.table3.horizontalHeaderItem(i).text()
-            table_3.write(0, i, data)
+            table_3.write(0, i, data, text_format)
         for i in range(self.table3.rowCount()):
             for j in range(self.table3.columnCount()):
                 data = self.table3.item(i, j).text()
@@ -1853,12 +1885,12 @@ class JunoUI(object):
                     data = float(data)
                 except:
                     pass
-                table_3.write(i + 1, j, data)
+                table_3.write(i + 1, j, data, text_format)
 
         table_4 = xlsx.add_worksheet('边界定义')
         for i in range(self.table4.columnCount()):
             data = self.table4.horizontalHeaderItem(i).text()
-            table_4.write(0, i, data)
+            table_4.write(0, i, data, text_format)
         for i in range(self.table4.rowCount()):
             for j in range(self.table4.columnCount()):
                 data = self.table4.item(i, j).text()
@@ -1866,12 +1898,12 @@ class JunoUI(object):
                     data = float(data)
                 except:
                     pass
-                table_4.write(i + 1, j, data)
+                table_4.write(i + 1, j, data, text_format)
 
         table_5 = xlsx.add_worksheet('人机策略-成本对比')
         for i in range(self.table5.columnCount()):
             data = self.table5.horizontalHeaderItem(i).text()
-            table_5.write(0, i, data)
+            table_5.write(0, i, data, text_format)
         for i in range(self.table5.rowCount()):
             for j in range(self.table5.columnCount()):
                 data = self.table5.item(i, j).text()
@@ -1879,12 +1911,12 @@ class JunoUI(object):
                     data = float(data)
                 except:
                     pass
-                table_5.write(i + 1, j, data)
+                table_5.write(i + 1, j, data, text_format)
 
         table_6 = xlsx.add_worksheet('人机策略-风险对比')
         for i in range(self.table6.columnCount()):
             data = self.table6.horizontalHeaderItem(i).text()
-            table_6.write(0, i, data)
+            table_6.write(0, i, data, text_format)
         for i in range(self.table6.rowCount()):
             for j in range(self.table6.columnCount()):
                 data = self.table6.item(i, j).text()
@@ -1892,14 +1924,9 @@ class JunoUI(object):
                     data = float(data)
                 except:
                     pass
-                table_6.write(i + 1, j, data)
+                table_6.write(i + 1, j, data, text_format)
 
         xlsx.close()
-
-        if '人机策略分布.png' in os.listdir('./'):
-            os.remove('人机策略分布.png')
-        if '两色散点图.png' in os.listdir('./'):
-            os.remove('两色散点图.png')
 
 
 if __name__ == '__main__':

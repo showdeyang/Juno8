@@ -9,12 +9,9 @@ import sklearn.utils._cython_blas
 import sklearn.neighbors._typedefs
 import sklearn.tree
 import sklearn.tree._utils
-import xlsxwriter
 import platform
-import math
 from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import Pipeline
-from sklearn.linear_model import BayesianRidge
 
 path = Path('./')
 
@@ -27,12 +24,14 @@ else:
     newline = '\n'
     encoding = 'gbk'
 
+
 def readJsonData(dataPath):
     with open(dataPath, 'r') as f:
         d = json.loads(f.read())
         
     dt = {key: [(i, float(value)) for i, value in enumerate(d[key]) if value] for key in d}
     return dt
+
 
 def knnRegress(X, maxT=None, n_points=2000, strength=0, locality=16.5):
     T = []
@@ -277,8 +276,7 @@ def strategy(trX, thresholds=None, typeDefs=None, safety=1):
     
     pipe = Pipeline([('scaler', StandardScaler()), ('knn', KNeighborsRegressor())])
     lossModel = pipe.fit([[*(X[i][xinds]), *y] for i, y in enumerate(Y)], L(X, Y, safety=safety))
-    
-    
+
     def localLoss(x):
         # xin = [[*(np.multiply(x, np.ones(Y.shape))[i][xinds]), *y] for i, y in enumerate(Y)]
         xin = [[*x, *y] for i, y in enumerate(Y)]
@@ -293,7 +291,7 @@ def strategy(trX, thresholds=None, typeDefs=None, safety=1):
     Y1 = [localLoss(x) for x in X[rinds]]
 
     X1,Y1 = np.array(X[rinds]), np.array(Y1)
-    #print(Y1[:20])
+    # print(Y1[:20])
     # pipe = Pipeline([('scaler', StandardScaler()), ('knn', BayesianRidge())])
     
     strat = [RandomForestRegressor().fit(X1, y) for y in Y1.T]
@@ -400,9 +398,6 @@ def efficacy(trX, strat, T, thresholds, typeDefs=None, startIndex=0, endIndex=No
     return decisions, predZ, consumptions, risks
 
 
-
-
-
 class analysis:
     def __init__(self, data, inputVars, controlVars, outputVars, thresholds, typeDefs=None, safety=0.7, startIndex=None, endIndex=None, verbose=True):
         # startIndex 和 endIndex 必须都要为负数
@@ -475,6 +470,7 @@ class analysis:
         
         res = crfRes(result)
         return res
+
 
 if __name__ == '__main__':
     # plt.style.use('dark_background')
