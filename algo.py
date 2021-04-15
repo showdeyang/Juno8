@@ -5,6 +5,7 @@ from pathlib import Path
 import sklearn
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.neighbors import KNeighborsRegressor
+from sklearn.linear_model import BayesianRidge
 import sklearn.utils._cython_blas
 import sklearn.neighbors._typedefs
 import sklearn.tree
@@ -12,7 +13,9 @@ import sklearn.tree._utils
 import platform
 from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import Pipeline
-
+from sklearn.svm import SVR
+import time
+from sklearn.decomposition import PCA
 path = Path('./')
 
 if platform.system() == 'Windows':
@@ -255,9 +258,9 @@ def strategy(trX, thresholds=None, typeDefs=None, safety=1):
     XY = trX[xyinds, :, 1].T
     Z = trX[zinds, :, 1].T
     
-    pipe = Pipeline([('scaler', StandardScaler()), ('knn', KNeighborsRegressor())])
+    #pipe = Pipeline([('scaler', StandardScaler()), ('knn', KNeighborsRegressor())])
     
-    model = [pipe.fit(XY, z) for z in Z.T]
+    model = [RandomForestRegressor(n_estimators=30).fit(XY, z) for z in Z.T]
     T = lambda xy: np.array([regr.predict(xy) for regr in model]).T
     
     THR = np.array([[[float(thresh.replace('q', '').replace("%", ''))/100, threshold[thresh]] for thresh in threshold] for threshold in thresholds])
@@ -274,7 +277,8 @@ def strategy(trX, thresholds=None, typeDefs=None, safety=1):
     def L(X, Y, safety):
         return (1 - safety) * J(Y) + safety * R(T([[*(X[i][xinds]), *y] for i, y in enumerate(Y)])) + 0.0001
     
-    pipe = Pipeline([('scaler', StandardScaler()), ('knn', KNeighborsRegressor())])
+    # pipe = Pipeline([('scaler', StandardScaler()), ('knn', KNeighborsRegressor())])
+    pipe = Pipeline([('scaler', StandardScaler()),('pca', PCA()),  ('knn', KNeighborsRegressor())])
     lossModel = pipe.fit([[*(X[i][xinds]), *y] for i, y in enumerate(Y)], L(X, Y, safety=safety))
 
     def localLoss(x):
@@ -289,12 +293,12 @@ def strategy(trX, thresholds=None, typeDefs=None, safety=1):
     rinds = random.sample(range(len(X)), k=int(len(X)/10))
     
     Y1 = [localLoss(x) for x in X[rinds]]
-
+    
     X1,Y1 = np.array(X[rinds]), np.array(Y1)
     # print(Y1[:20])
     # pipe = Pipeline([('scaler', StandardScaler()), ('knn', BayesianRidge())])
     
-    strat = [RandomForestRegressor().fit(X1, y) for y in Y1.T]
+    strat = [RandomForestRegressor(n_estimators=30).fit(X1, y) for y in Y1.T]
     S = lambda x: np.array([regr.predict(x) for regr in strat]).T
     
     return S, T
@@ -401,6 +405,7 @@ def efficacy(trX, strat, T, thresholds, typeDefs=None, startIndex=0, endIndex=No
 class analysis:
     def __init__(self, data, inputVars, controlVars, outputVars, thresholds, typeDefs=None, safety=0.7, startIndex=None, endIndex=None, verbose=True):
         # startIndex 和 endIndex 必须都要为负数
+        t1 = time.time()
         xinds = [i for i, td in enumerate(typeDefs) if td < 0]
         yinds = [i for i, td in enumerate(typeDefs) if 0 <= td <= 1]
         xyinds = [i for i, td in enumerate(typeDefs) if td < 2]
@@ -438,10 +443,12 @@ class analysis:
         self.Xopt = self.Xhm
 
         self.train()
+        t2 = time.time()
+        print('time taken', t2-t1)
         
     def train(self):  # opt 机器
         # pipe = Pipeline([('scaler', StandardScaler()), ('knn', KNeighborsRegressor())])
-        strat = [RandomForestRegressor().fit(self.X, y) for y in self.Y.T]
+        strat = [RandomForestRegressor(n_estimators=30).fit(self.X, y) for y in self.Y.T]
         self.S_hm = lambda x: np.array([regr.predict(x) for regr in strat]).T
 
         self.S, self.T = strategy(self.trX, thresholds=self.thresholds, typeDefs=self.typeDefs, safety=self.safety)
@@ -497,3 +504,4 @@ if __name__ == '__main__':
     print(A.consumptions)
     print('time taken', time.time()-t1)
 
+    
