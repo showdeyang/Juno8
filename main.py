@@ -53,7 +53,7 @@ class JunoUI(object):
 
         juno.setCentralWidget(self.main_content)
         juno.resize(width, height)
-
+        juno.move(self.screen_width / 2 - width / 2, self.screen_height / 2 - height / 2)
         self.load_project_table()
 
     def load_project_table(self):
@@ -348,7 +348,7 @@ class JunoUI(object):
         self.task_table = QTableWidget()
         self.task_table.setColumnCount(1)
         self.task_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        self.task_table.clicked.connect(partial(self.config_window, project_name, juno))
+        self.task_table.clicked.connect(partial(self.click_config_window, project_name, juno))
         self.task_table.verticalHeader().setVisible(False)
         self.task_table.horizontalHeader().setVisible(False)
 
@@ -369,7 +369,9 @@ class JunoUI(object):
             self.value = json.load(f)
 
         juno.setCentralWidget(task_content)
-        juno.resize(width, height)
+        juno.setFixedHeight(height)
+        juno.setFixedWidth(width)
+        juno.move(self.screen_width/2-width/2, self.screen_height/2-height/2)
         self.load_task_table(project_name)
 
     def task_textedit_change(self, project_name):
@@ -409,6 +411,11 @@ class JunoUI(object):
 
     def task_back_btn(self, juno):
         self.Main_Window(juno)
+
+    def click_config_window(self, project_name, juno):
+        juno.close()
+        juno = QMainWindow()
+        self.config_window(project_name, juno)
 
     def config_window(self, project_name, juno, *task_name_1):
         juno.setWindowTitle(Version + ' - 配置参数')
@@ -464,7 +471,7 @@ class JunoUI(object):
         var_layout.addWidget(action_content)
         var_layout.addWidget(result_content)
 
-        cost_table_label = QLabel('成本占比:\n')
+        cost_table_label = QLabel('成本占比:')
         self.cost_table = QTableWidget()
         self.cost_table.setColumnCount(2)
         self.cost_table.verticalHeader().setVisible(False)
@@ -481,7 +488,8 @@ class JunoUI(object):
         config_layout_1.addWidget(var_content)
         config_layout_1.addWidget(cost_table_content)
 
-        risk_table_label = QLabel('重要性占比:\n')
+        risk_table_label = QLabel('  重要性占比:')
+        risk_table_label.setFixedHeight(self.screen_height*0.029)
         self.risk_table = QTableWidget()
         self.risk_table.setColumnCount(2)
         self.risk_table.verticalHeader().setVisible(False)
@@ -489,21 +497,20 @@ class JunoUI(object):
         self.risk_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.risk_table.clicked.connect(self.risk_to_border)
         risk_table_content = QWidget()
-        risk_table_content.setFixedWidth(self.screen_width*0.49)
         risk_table_layout = QVBoxLayout(risk_table_content)
         risk_table_layout.addWidget(risk_table_label)
         risk_table_layout.addWidget(self.risk_table)
 
-        border_table_label = QLabel('边界设置:\n')
+        border_table_label = QLabel('边界设置:')
         self.border_add_btn = QPushButton('添加边界')
         self.border_add_btn.clicked.connect(self.border_table_add_row)
         self.border_add_btn.setDisabled(True)
-        content = QWidget()
-        layout = QHBoxLayout(content)
-        layout.addWidget(border_table_label)
-        layout.addWidget(self.border_add_btn)
+        label_1_content = QWidget()
+        label_1_layout = QHBoxLayout(label_1_content)
+        label_1_layout.addWidget(border_table_label)
+        label_1_layout.addWidget(self.border_add_btn)
         self.border_table = QTableWidget()
-        self.border_table.setFixedHeight(self.screen_height*0.15)
+        self.border_table.setFixedHeight(self.screen_height*0.17)
         self.border_table.setColumnCount(3)
         self.border_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.border_table.cellChanged.connect(self.borber_table_cell_change)
@@ -514,7 +521,7 @@ class JunoUI(object):
         self.border_table_graph_plt = self.border_table_graph.addPlot()
         border_table_content = QWidget()
         border_table_layout = QVBoxLayout(border_table_content)
-        border_table_layout.addWidget(content)
+        border_table_layout.addWidget(label_1_content)
         border_table_layout.addWidget(self.border_table)
         border_table_layout.addWidget(self.border_table_graph)
 
@@ -1982,7 +1989,7 @@ class JunoUI(object):
 
 
 if __name__ == '__main__':
-    QApplication.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling)
+    # QApplication.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling)
     app = QApplication(sys.argv)
     current_screen_width = app.desktop().screenGeometry().width()
     current_screen_height = app.desktop().screenGeometry().height()
