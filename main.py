@@ -53,7 +53,7 @@ class JunoUI(object):
 
         juno.setCentralWidget(self.main_content)
         juno.resize(width, height)
-        juno.move(self.screen_width / 2 - width / 2, self.screen_height / 2 - height / 2)
+        # juno.move(self.screen_width / 2 - width / 2, self.screen_height / 2 - height / 2)
         self.load_project_table()
 
     def load_project_table(self):
@@ -156,59 +156,82 @@ class JunoUI(object):
 
         sheet = wb.sheet_by_index(0)
 
-        self.value_temp = {}
+        # 判断一级标题所在行数
+        title_1_row = 0
+        for title_1_row in range(sheet.nrows):
+            count = 0
+            for cell in sheet.row_values(title_1_row):
+                if cell != '':
+                    count += 1
+            if count > 3:
+                print('一级标题行：', title_1_row+1)
+                break
 
-        #  通过单元格中是否几乎都是空来判断表头空行
-        #  通过单元格中包含了括号的单元格数占比是否过半来寻找单位行
-        #  在表头空行以下、单位行以上的行，都是一级、二级、三级等标题，适用于“前格字符复制给之后的若干空格”
-        #  拼接一级、二级、三级、单位，组合成统一的指标名称
-        #  还要考虑是否有备注？有的话 pop 掉
+        # 判断单位所在行数
+        unit_row = 0
+        for unit_row in range(sheet.nrows):
+            count = 0
+            for cell in sheet.row_values(unit_row):
+                if type(cell) == str and '/' in cell:
+                    count += 1
+            if count / sheet.row_len(unit_row) > 0.5:
+                print('单位行：', unit_row+1)
+                break
 
-        # 填充第三行的大名称
-        last_name_1 = ''
-        name_1 = []
-        for i in sheet.row_values(2):
-            if i != '':
-                last_name_1 = i
-            else:
-                i = last_name_1
-            name_1.append(i)
-
-        # 填充第四行的小名称
-        last_name_2 = ''
-        name_2 = []
-        for i in sheet.row_values(3):
-            if '\n' in i:
-                i = i.replace('\n', '')
-            if '（' in i:
-                i = i.replace('（', '(')
-            if '）' in i:
-                i = i.replace('）', ')')
-            if i != '':
-                last_name_2 = i
-            else:
-                i = last_name_2 + "%"
-            name_2.append(i)
-        name_2[0] = ''
-        name_2[-1] = ''
-
-        # 组合成 "大名称-小名称 单位"
-        if len(name_1) == len(name_2):
-            for i in range(len(name_1)):
-                if name_2[i] == '':
-                    str_name = name_1[i]
-                else:
-                    unit = sheet.row_values(4)[i]
-                    if unit != '' and unit != '/':
-                        str_name = str(name_1[i]) + "-" + str(name_2[i]) + " " + str(unit)
+        # 从一级标题行开始到单位行之前，智能填充其间空格的原本单位(不能无脑沿用上一次的单位，还要考虑父标题是否相同才行)
+        titles = []
+        for i in range(title_1_row, unit_row):
+            title = []
+            last_h = ''
+            if i == title_1_row:
+                for j in sheet.row_values(i):
+                    if j != '':
+                        title.append(j)
+                        last_h = j
                     else:
-                        str_name = str(name_1[i]) + "-" + str(name_2[i])
-                self.value_temp.update({str_name: []})
-        else:
-            self.errorText.setText('表格第3、4行长度不一致!')
-            return
+                        title.append(last_h)
+            else:
+                index = 0
+                last_v = ''
+                for j in sheet.row_values(i):
+                    if j != '':
+                        title.append(j)
+                        last_h = j
+                        last_v = titles[-1][index]
+                    else:
+                        if titles[-1][index] == last_v:
+                            title.append(last_h)
+                        else:
+                            title.append('')
+                            last_h = ''
+                    index += 1
+            titles.append(title)
 
-        self.value_temp.pop('备注')
+        # 转置
+        title = []
+        for i in sheet.row_values(unit_row):
+            title.append(i)
+        titles.append(title)
+        titles = np.array(titles).transpose().tolist()
+
+        # 去除二三级标题中重复的名称和空值，以及对标题内字符的规范化
+        titles_final = []
+        remark_flag = False
+        for title in titles:
+            title_new = ''
+            for cell in title:
+                if '\n' in cell:
+                    cell = cell.replace("\n", '')
+                if '（' in cell:
+                    cell = cell.replace("（", '(')
+                if '）' in cell:
+                    cell = cell.replace("）", ')')
+                if cell not in title_new and cell != '':
+                    title_new += cell + "_"
+            titles_final.append(title_new[:-1])
+        if titles_final[-1] == '备注':
+            remark_flag = True
+            titles_final.remove('备注')
 
         # 将列数转换成AZ
         def col2az(col):
@@ -245,13 +268,17 @@ class JunoUI(object):
                         row[block_count] = float(row[block_count].replace('《', '')) / 2.0
                     elif '＜' in row[block_count]:
                         row[block_count] = float(row[block_count].replace('＜', '')) / 2.0
-                if row[block_count] == '-' or row[block_count] == '—' or row[block_count] == '——' or row[block_count] == '－' or row[block_count] == '—' or row[block_count] == '——' or row[block_count] == '-' or row[block_count] == '_' or row[block_count] == '－' or row[block_count] == '＿':
+                if row[block_count] == '-' or row[block_count] == '—' or row[block_count] == '——' or row[
+                    block_count] == '－' or \
+                        row[block_count] == '—' or row[block_count] == '——' or row[block_count] == '-' or row[
+                    block_count] == '_' or row[block_count] == '－' or row[block_count] == '＿':
                     row[block_count] = ''
-                if row[block_count] == '\\' or row[block_count] == '/' or row[block_count] == '＼' or row[block_count] == '／' or row[block_count] == '|' or row[block_count] == '｜':
+                if row[block_count] == '\\' or row[block_count] == '/' or row[block_count] == '＼' or row[
+                    block_count] == '／' or \
+                        row[block_count] == '|' or row[block_count] == '｜':
                     row[block_count] = ''
                 if row[block_count] == '.' or row[block_count] == '．':
                     row[block_count] = ''
-
             return row
 
         # 数据类型无法纠正的，给出警告
@@ -266,58 +293,48 @@ class JunoUI(object):
                     ord_list = []
                     for i in a:
                         ord_list.append(ord(i))
-                    error = str(row_index + 1) + " 行 " + col2az(col) + " 列，参数 \'" + str(a) + " " + str(ord_list) + "\' 格式错误！\n"
+                    error = str(row_index + 1) + " 行 " + col2az(col) + " 列，参数 \'" + str(a) + "\' 格式错误！\n"
                     error_per_row += error
             return error_per_row
 
+        # 获取数据部分的开始行
+        data_start = 0
+        for i in sheet.col_values(0):
+            if type(i) == float:
+                break
+            data_start += 1
+        print('数据开始行：', data_start+1)
+
         matrix = []
         error_total = ''
-        # 将表格的数据部分组合成一个二维list，并趁机对每个数据进行格式检查
-        for row_num in range(sheet.nrows):
-            if row_num < 6:  # 抛弃表的前6行
-                continue
-            if sheet.row_values(row_num)[0] == '':
-                break
+        # 将表格的数据部分组合成一个二维list，并对每个数据进行格式检查
+        for row_num in range(data_start, sheet.nrows):
             row = [i for i in sheet.row_values(row_num)]
-            row = row[:-1]  # 去除最后一列备注
-
+            if remark_flag:
+                row = row[:-1]  # 去除备注
             row = value_rectify(row)
             error_total += value_check(row_num, row)
             matrix.append(row)
-        # 如果数据存在格式错误，则弹窗告错
+
         if error_total != '':
             self.errorText.setText(error_total)
             self.errorText.append('\n文件导入失败!')
-
-            self.value_temp = {}  # 清除已导入的错误数据
             return
 
         # 二维数据表xy转置成二维list: a天每天记录b种数据 变成 b种数据每种记录a天
         matrix_trans = np.array(matrix).transpose().tolist()
 
-        enumerate_value = list(enumerate(self.value_temp))
-        matrix_trans_temp = []
-        name_filter = []
-        index = -1
+        data = {}
+        index = 0
+        # 去除整列都没有数据的指标
         for a in matrix_trans:
+            if ''.join(a).strip():
+                data.update({titles_final[index]: a})
             index += 1
-            s = ('').join(a).strip()
-            if not s:
-                name_filter.append(enumerate_value[index][1])
-                continue
-            matrix_trans_temp.append(a)
-        print(self.value_temp)
-        for a in name_filter:
-            self.value_temp.pop(a)
+        self.value_temp = data
 
-        # 将转置后的二维list依次填进字典的每种"大名称-小名称 单位"中
-        row_count = -1
-        for i in self.value_temp:
-            row_count += 1
-            value_per_col = matrix_trans_temp[row_count]
-            self.value_temp.update({i: value_per_col})
-
-        self.errorText.setText('文件导入成功!')
+        success_text = '一级标题行: ' + str(title_1_row+1) + '\n单位行: ' + str(unit_row+1) + '\n数据开始行: ' + str(data_start+1) + '\n备注: ' + str(remark_flag) + '\n\n数据导入成功!'
+        self.errorText.setText(success_text)
         self.selectFile.setText(self.filename)
         self.input_change()
 
@@ -371,7 +388,7 @@ class JunoUI(object):
         juno.setCentralWidget(task_content)
         juno.setFixedHeight(height)
         juno.setFixedWidth(width)
-        juno.move(self.screen_width/2-width/2, self.screen_height/2-height/2)
+        # juno.move(self.screen_width/2-width/2, self.screen_height/2-height/2)
         self.load_task_table(project_name)
 
     def task_textedit_change(self, project_name):
@@ -431,11 +448,11 @@ class JunoUI(object):
         self.situation_table = QTableWidget()
         self.situation_table.setColumnCount(2)
         self.situation_table.verticalHeader().setVisible(False)
-        self.situation_table.setHorizontalHeaderLabels(['指标', ''])
+        self.situation_table.setHorizontalHeaderLabels(['情况选择', ''])
         self.situation_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         situation_content = QWidget()
         situation_layout = QFormLayout(situation_content)
-        situation_layout.addRow("情况选择 ", self.situation_combo)
+        situation_layout.addRow(self.situation_combo)
         situation_layout.addRow(self.situation_table)
 
         self.action_combo = QComboBox()
@@ -444,11 +461,11 @@ class JunoUI(object):
         self.action_table = QTableWidget()
         self.action_table.setColumnCount(2)
         self.action_table.verticalHeader().setVisible(False)
-        self.action_table.setHorizontalHeaderLabels(['指标', ''])
+        self.action_table.setHorizontalHeaderLabels(['行为选择', ''])
         self.action_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         action_content = QWidget()
         action_layout = QFormLayout(action_content)
-        action_layout.addRow("行为选择 ", self.action_combo)
+        action_layout.addRow(self.action_combo)
         action_layout.addRow(self.action_table)
 
         self.result_combo = QComboBox()
@@ -457,11 +474,11 @@ class JunoUI(object):
         self.result_table = QTableWidget()
         self.result_table.setColumnCount(2)
         self.result_table.verticalHeader().setVisible(False)
-        self.result_table.setHorizontalHeaderLabels(['指标', ''])
+        self.result_table.setHorizontalHeaderLabels(['结果选择', ''])
         self.result_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         result_content = QWidget()
         result_layout = QFormLayout(result_content)
-        result_layout.addRow("结果选择 ", self.result_combo)
+        result_layout.addRow(self.result_combo)
         result_layout.addRow(self.result_table)
 
         var_content = QWidget()
@@ -637,6 +654,8 @@ class JunoUI(object):
         cancel_button.clicked.connect(self.situation_combo_cancel)
         self.situation_table.setCellWidget(self.situation_table.rowCount() - 1, 1, cancel_button)
 
+        self.situation_table.resizeRowsToContents()
+
     def situation_combo_cancel(self):
         index = self.situation_table.currentRow()
         name = self.situation_table.item(index, 0).text()
@@ -696,6 +715,8 @@ class JunoUI(object):
         cancel_button = QPushButton('删除')
         cancel_button.clicked.connect(self.action_combo_cancel)
         self.action_table.setCellWidget(self.action_table.rowCount() - 1, 1, cancel_button)
+
+        self.action_table.resizeRowsToContents()
 
         item = QTableWidgetItem(action_current)
         item.setFlags(QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled)
@@ -777,6 +798,8 @@ class JunoUI(object):
         cancel_button = QPushButton('删除')
         cancel_button.clicked.connect(self.result_combo_cancel)
         self.result_table.setCellWidget(self.result_table.rowCount() - 1, 1, cancel_button)
+
+        self.result_table.resizeRowsToContents()
 
         item = QTableWidgetItem(result_current)
         item.setFlags(QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled)

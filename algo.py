@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import numpy as np
+import sys
 import random
 from pathlib import Path
 import sklearn
@@ -16,6 +17,11 @@ from sklearn.pipeline import Pipeline
 from sklearn.svm import SVR
 import time
 from sklearn.decomposition import PCA
+import warnings
+
+if not sys.warnoptions:
+    warnings.simplefilter("ignore")
+
 path = Path('./')
 
 if platform.system() == 'Windows':
@@ -263,7 +269,7 @@ def strategy(trX, thresholds=None, typeDefs=None, safety=1):
     model = [RandomForestRegressor(n_estimators=30).fit(XY, z) for z in Z.T]
     T = lambda xy: np.array([regr.predict(xy) for regr in model]).T
     
-    THR = np.array([[[float(thresh.replace('q', '').replace("%", ''))/100, threshold[thresh]] for thresh in threshold] for threshold in thresholds])
+    THR = np.array([[[float(thresh.replace('q', '').replace("%", ''))/100, threshold[thresh]] for thresh in threshold] for threshold in thresholds], dtype=object)
 
     X1 = []
     Y1 = []
@@ -323,7 +329,7 @@ def efficacy(trX, strat, T, thresholds, typeDefs=None, startIndex=0, endIndex=No
     
     predZ = T(xin)
     
-    THR = np.array([[[float(thresh.replace('q', '').replace("%", ''))/100, threshold[thresh]] for thresh in threshold] for threshold in thresholds])
+    THR = np.array([[[float(thresh.replace('q', '').replace("%", ''))/100, threshold[thresh]] for thresh in threshold] for threshold in thresholds], dtype=object)
     
     consumptions = []
     for i, y in enumerate(Y):
