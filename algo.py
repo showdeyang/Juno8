@@ -256,7 +256,7 @@ def strategy(trX, thresholds=None, typeDefs=None, safety=1):
     typeDefs = np.array(typeDefs)
     xinds = [i for i, td in enumerate(typeDefs) if td < 0]
     yinds = [i for i, td in enumerate(typeDefs) if 0 <= td <= 1]
-    xyinds = [i for i, td in enumerate(typeDefs) if td < 2]
+    xyinds = [i for i, td in enumerate(typeDefs) if td < 2] 
     zinds = [i for i, td in enumerate(typeDefs) if td >= 2]
     
     X = trX[xinds, :, 1].T
@@ -283,8 +283,8 @@ def strategy(trX, thresholds=None, typeDefs=None, safety=1):
     def L(X, Y, safety):
         return (1 - safety) * J(Y) + safety * R(T([[*(X[i][xinds]), *y] for i, y in enumerate(Y)])) + 0.0001
     
-    # pipe = Pipeline([('scaler', StandardScaler()), ('knn', KNeighborsRegressor())])
-    pipe = Pipeline([('scaler', StandardScaler()),('pca', PCA()),  ('knn', KNeighborsRegressor())])
+    pipe = Pipeline([('scaler', StandardScaler()), ('knn', KNeighborsRegressor())])
+    # pipe = Pipeline([('scaler', StandardScaler()),('pca', PCA()),  ('knn', KNeighborsRegressor())])
     lossModel = pipe.fit([[*(X[i][xinds]), *y] for i, y in enumerate(Y)], L(X, Y, safety=safety))
 
     def localLoss(x):
@@ -442,10 +442,10 @@ class analysis:
         self.xinds = xinds
         self.yinds = yinds
         self.zinds = zinds
-
-        self.Xhm = self.X[startIndex:endIndex]
-        self.Yhm = self.Y[startIndex:endIndex]
-        self.Zhm = self.Z[startIndex:endIndex]
+        
+        self.Xhm = self.X[startIndex:endIndex] 
+        self.Yhm = self.Y[startIndex:endIndex] 
+        self.Zhm = self.Z[startIndex:endIndex] 
         self.Xopt = self.Xhm
 
         self.train()

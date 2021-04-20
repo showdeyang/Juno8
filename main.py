@@ -1,7 +1,10 @@
 import sys
 import os
 from PyQt5 import QtCore, QtGui
+from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QPalette, QColor
 from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QPushButton, QLabel, QComboBox, QTableWidget, QTableWidgetItem, QFileDialog, QFormLayout, QVBoxLayout, QHBoxLayout, QTabWidget, QTextEdit, QTextBrowser, QDateEdit, QHeaderView
+
 from functools import partial
 import xlrd
 import xlsxwriter
@@ -31,6 +34,8 @@ class JunoUI(object):
         self.filename = ''
 
     def Main_Window(self, juno):
+        
+        
         width = 0.3 * self.screen_width
         height = 0.3 * self.screen_height
 
@@ -534,7 +539,7 @@ class JunoUI(object):
         self.border_table.verticalHeader().setVisible(False)
         self.border_table.horizontalHeader().setVisible(False)
         self.border_table_graph = pyqtgraph.GraphicsLayoutWidget()
-        self.border_table_graph.setBackground('#ffffff')
+        self.border_table_graph.setBackground('#000000')
         self.border_table_graph_plt = self.border_table_graph.addPlot()
         border_table_content = QWidget()
         border_table_layout = QVBoxLayout(border_table_content)
@@ -1120,7 +1125,7 @@ class JunoUI(object):
 
         self.graph1_label = QLabel('人机策略分布\n')
         self.graph1 = pyqtgraph.GraphicsLayoutWidget()
-        self.graph1.setBackground('#ffffff')
+        self.graph1.setBackground('#000000')
         self.plt1 = self.graph1.addPlot()
         self.graph1_combo = QComboBox()
         self.graph1_combo.activated.connect(partial(self.graph1_combo_change, result))
@@ -1132,7 +1137,7 @@ class JunoUI(object):
 
         self.graph2_label = QLabel('两色散点图\n')
         self.graph2 = pyqtgraph.PlotWidget()
-        self.graph2.setBackground('#ffffff')
+        self.graph2.setBackground('#000000')
         self.graph2.showGrid(x=True, y=True)
         self.graph2.getAxis('bottom').setLabel(**{"color": "#999", "font-size": "8pt"})
         self.graph2.getAxis('left').setLabel(**{"color": "#999", "font-size": "8pt"})
@@ -2012,8 +2017,26 @@ class JunoUI(object):
 
 
 if __name__ == '__main__':
-    # QApplication.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling)
+    QApplication.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling)
     app = QApplication(sys.argv)
+    app.setStyle('Fusion')
+    palette = QPalette()
+    palette.setColor(QPalette.Window, QColor(24,26,24))
+    palette.setColor(QPalette.WindowText, Qt.white)
+    palette.setColor(QPalette.Base, QColor(52,54,52))
+    palette.setColor(QPalette.AlternateBase, QColor(24,26,24))
+    palette.setColor(QPalette.ToolTipBase, Qt.black)
+    palette.setColor(QPalette.ToolTipText, Qt.white)
+    palette.setColor(QPalette.Text, Qt.white)
+    palette.setColor(QPalette.Button, QColor(24,26,24))
+    palette.setColor(QPalette.ButtonText, Qt.white)
+    palette.setColor(QPalette.BrightText, Qt.red)
+    palette.setColor(QPalette.Link, QColor(42, 130, 218))
+    palette.setColor(QPalette.Highlight, QColor(42, 130, 218))
+    palette.setColor(QPalette.HighlightedText, Qt.black)
+    app.setPalette(palette)
+    
+    
     current_screen_width = app.desktop().screenGeometry().width()
     current_screen_height = app.desktop().screenGeometry().height()
     MainWindow = QMainWindow()
