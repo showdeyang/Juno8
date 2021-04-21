@@ -36,7 +36,7 @@
 
 #gwTab {
 	border: 1px;
-	border-radius: 5px
+	border-radius: 0px
 }
 
 
@@ -212,17 +212,21 @@ QTableView {
 
 QTabBar {
 	margin-left: 2px;
-border-radius: 10px;
+border-radius: 0px;
 }
 
 QTabBar::tab {
-	border-radius: 10px;
+	border-radius: 0px;
 	padding: 4px;
 	margin: 4px;
 }
 
 QTabBar::tab:selected {
 	background: #353535;
+}
+
+QComboBox {
+    height: 25
 }
 
 QComboBox::down-arrow {
@@ -232,7 +236,7 @@ QComboBox::down-arrow {
 
 QComboBox::drop-down {
 	border: 1px solid #5A5A5A;
-	border-radius: 5px;
+	border-radius: 0px;
 	background: #353535;
 }
 

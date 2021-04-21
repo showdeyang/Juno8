@@ -1,10 +1,8 @@
+
 import sys
 import os
-from PyQt5 import QtCore, QtGui
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QPalette, QColor
+from PyQt5 import QtCore
 from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QPushButton, QLabel, QComboBox, QTableWidget, QTableWidgetItem, QFileDialog, QFormLayout, QVBoxLayout, QHBoxLayout, QTabWidget, QTextEdit, QTextBrowser, QDateEdit, QHeaderView
-
 from functools import partial
 import xlrd
 import xlsxwriter
@@ -14,6 +12,7 @@ import pyqtgraph.exporters
 import json
 import numpy as np
 import algo
+import qdarkstyle
 
 Version = 'Juno 2.1'
 if not os.path.isdir('./JunoProject'):
@@ -23,10 +22,7 @@ if not os.path.isdir('./SourceTable'):
 
 
 class JunoUI(object):
-    def __init__(self, juno, width, height):
-        self.screen_width = width
-        self.screen_height = height
-
+    def __init__(self, juno):
         self.central_widget = QWidget(juno)
         self.Main_Window(juno)
 
@@ -34,11 +30,6 @@ class JunoUI(object):
         self.filename = ''
 
     def Main_Window(self, juno):
-        
-        
-        width = 0.3 * self.screen_width
-        height = 0.3 * self.screen_height
-
         juno.setWindowTitle(Version + ' - 项目')
         new_project_btn = QPushButton('新建项目')
         new_project_btn.clicked.connect(partial(self.new_project_window, juno))
@@ -51,14 +42,14 @@ class JunoUI(object):
         self.project_table.clicked.connect(partial(self.task_window_pre, juno))
 
         self.main_content = QWidget()
-        self.main_content.setMinimumSize(width, height)
+        self.main_content.setMinimumSize(400, 300)
         main_layout = QHBoxLayout(self.main_content)
         main_layout.addWidget(new_project_btn)
         main_layout.addWidget(self.project_table)
 
         juno.setCentralWidget(self.main_content)
-        juno.resize(width, height)
-        # juno.move(self.screen_width / 2 - width / 2, self.screen_height / 2 - height / 2)
+        juno.resize(400, 300)
+
         self.load_project_table()
 
     def load_project_table(self):
@@ -78,17 +69,12 @@ class JunoUI(object):
             count += 1
 
     def new_project_window(self, juno):
-        width = 0.3 * self.screen_width
-        height = 0.3 * self.screen_height
-
         juno.setWindowTitle(Version + ' - 新建项目')
         setName_label = QLabel('项目名称:')
-        setName_label.setFixedHeight(self.screen_height*0.023)
         self.inputName = QTextEdit()
         self.inputName.textChanged.connect(self.input_change)
-        self.inputName.setFixedHeight(self.screen_height*0.023)
         input_name_content = QWidget()
-        input_name_content.setFixedHeight(self.screen_height*0.033)
+        input_name_content.setFixedHeight(42)
         input_name_layout = QHBoxLayout(input_name_content)
         input_name_layout.addWidget(setName_label)
         input_name_layout.addWidget(self.inputName)
@@ -109,7 +95,7 @@ class JunoUI(object):
         YesOrNo_layout.addWidget(self.yesButton)
 
         new_project_content = QWidget()
-        new_project_content.setMinimumSize(width, height)
+        new_project_content.setMinimumSize(400, 300)
         new_project_layout = QVBoxLayout(new_project_content)
         new_project_layout.addWidget(input_name_content)
         new_project_layout.addWidget(self.selectFile)
@@ -137,6 +123,7 @@ class JunoUI(object):
         with open('./JunoProject/' + project_name + '/value.json', 'w') as f:
             f.write(json.dumps(self.value_temp))
 
+        # self.task_window(project_name, juno)
         self.Main_Window(juno)
 
     def new_project_no(self, juno):
@@ -161,82 +148,53 @@ class JunoUI(object):
 
         sheet = wb.sheet_by_index(0)
 
-        # 判断一级标题所在行数
-        title_1_row = 0
-        for title_1_row in range(sheet.nrows):
-            count = 0
-            for cell in sheet.row_values(title_1_row):
-                if cell != '':
-                    count += 1
-            if count > 3:
-                print('一级标题行：', title_1_row+1)
-                break
+        self.value_temp = {}
 
-        # 判断单位所在行数
-        unit_row = 0
-        for unit_row in range(sheet.nrows):
-            count = 0
-            for cell in sheet.row_values(unit_row):
-                if type(cell) == str and '/' in cell:
-                    count += 1
-            if count / sheet.row_len(unit_row) > 0.5:
-                print('单位行：', unit_row+1)
-                break
-
-        # 从一级标题行开始到单位行之前，智能填充其间空格的原本单位(不能无脑沿用上一次的单位，还要考虑父标题是否相同才行)
-        titles = []
-        for i in range(title_1_row, unit_row):
-            title = []
-            last_h = ''
-            if i == title_1_row:
-                for j in sheet.row_values(i):
-                    if j != '':
-                        title.append(j)
-                        last_h = j
-                    else:
-                        title.append(last_h)
+        # 填充第三行的大名称
+        last_name_1 = ''
+        name_1 = []
+        for i in sheet.row_values(2):
+            if i != '':
+                last_name_1 = i
             else:
-                index = 0
-                last_v = ''
-                for j in sheet.row_values(i):
-                    if j != '':
-                        title.append(j)
-                        last_h = j
-                        last_v = titles[-1][index]
+                i = last_name_1
+            name_1.append(i)
+
+        # 填充第四行的小名称
+        last_name_2 = ''
+        name_2 = []
+        for i in sheet.row_values(3):
+            if '\n' in i:
+                i = i.replace('\n', '')
+            if '（' in i:
+                i = i.replace('（', '(')
+            if '）' in i:
+                i = i.replace('）', ')')
+            if i != '':
+                last_name_2 = i
+            else:
+                i = last_name_2 + "%"
+            name_2.append(i)
+        name_2[0] = ''
+        name_2[-1] = ''
+
+        # 组合成 "大名称-小名称 单位"
+        if len(name_1) == len(name_2):
+            for i in range(len(name_1)):
+                if name_2[i] == '':
+                    str_name = name_1[i]
+                else:
+                    unit = sheet.row_values(4)[i]
+                    if unit != '' and unit != '/':
+                        str_name = str(name_1[i]) + "-" + str(name_2[i]) + " " + str(unit)
                     else:
-                        if titles[-1][index] == last_v:
-                            title.append(last_h)
-                        else:
-                            title.append('')
-                            last_h = ''
-                    index += 1
-            titles.append(title)
+                        str_name = str(name_1[i]) + "-" + str(name_2[i])
+                self.value_temp.update({str_name: []})
+        else:
+            self.errorText.setText('表格第3、4行长度不一致!')
+            return
 
-        # 转置
-        title = []
-        for i in sheet.row_values(unit_row):
-            title.append(i)
-        titles.append(title)
-        titles = np.array(titles).transpose().tolist()
-
-        # 去除二三级标题中重复的名称和空值，以及对标题内字符的规范化
-        titles_final = []
-        remark_flag = False
-        for title in titles:
-            title_new = ''
-            for cell in title:
-                if '\n' in cell:
-                    cell = cell.replace("\n", '')
-                if '（' in cell:
-                    cell = cell.replace("（", '(')
-                if '）' in cell:
-                    cell = cell.replace("）", ')')
-                if cell not in title_new and cell != '':
-                    title_new += cell + "_"
-            titles_final.append(title_new[:-1])
-        if titles_final[-1] == '备注':
-            remark_flag = True
-            titles_final.remove('备注')
+        self.value_temp.pop('备注')
 
         # 将列数转换成AZ
         def col2az(col):
@@ -273,17 +231,13 @@ class JunoUI(object):
                         row[block_count] = float(row[block_count].replace('《', '')) / 2.0
                     elif '＜' in row[block_count]:
                         row[block_count] = float(row[block_count].replace('＜', '')) / 2.0
-                if row[block_count] == '-' or row[block_count] == '—' or row[block_count] == '——' or row[
-                    block_count] == '－' or \
-                        row[block_count] == '—' or row[block_count] == '——' or row[block_count] == '-' or row[
-                    block_count] == '_' or row[block_count] == '－' or row[block_count] == '＿':
+                if row[block_count] == '-' or row[block_count] == '—' or row[block_count] == '——' or row[block_count] == '－' or row[block_count] == '—' or row[block_count] == '——' or row[block_count] == '-' or row[block_count] == '_' or row[block_count] == '－' or row[block_count] == '＿':
                     row[block_count] = ''
-                if row[block_count] == '\\' or row[block_count] == '/' or row[block_count] == '＼' or row[
-                    block_count] == '／' or \
-                        row[block_count] == '|' or row[block_count] == '｜':
+                if row[block_count] == '\\' or row[block_count] == '/' or row[block_count] == '＼' or row[block_count] == '／' or row[block_count] == '|' or row[block_count] == '｜':
                     row[block_count] = ''
                 if row[block_count] == '.' or row[block_count] == '．':
                     row[block_count] = ''
+
             return row
 
         # 数据类型无法纠正的，给出警告
@@ -298,48 +252,58 @@ class JunoUI(object):
                     ord_list = []
                     for i in a:
                         ord_list.append(ord(i))
-                    error = str(row_index + 1) + " 行 " + col2az(col) + " 列，参数 \'" + str(a) + "\' 格式错误！\n"
+                    error = str(row_index + 1) + " 行 " + col2az(col) + " 列，参数 \'" + str(a) + " " + str(ord_list) + "\' 格式错误！\n"
                     error_per_row += error
             return error_per_row
 
-        # 获取数据部分的开始行
-        data_start = 0
-        for i in sheet.col_values(0):
-            if type(i) == float:
-                break
-            data_start += 1
-        print('数据开始行：', data_start+1)
-
         matrix = []
         error_total = ''
-        # 将表格的数据部分组合成一个二维list，并对每个数据进行格式检查
-        for row_num in range(data_start, sheet.nrows):
+        # 将表格的数据部分组合成一个二维list，并趁机对每个数据进行格式检查
+        for row_num in range(sheet.nrows):
+            if row_num < 6:  # 抛弃表的前6行
+                continue
+            if sheet.row_values(row_num)[0] == '':
+                break
             row = [i for i in sheet.row_values(row_num)]
-            if remark_flag:
-                row = row[:-1]  # 去除备注
+            row = row[:-1]  # 去除最后一列备注
+
             row = value_rectify(row)
             error_total += value_check(row_num, row)
             matrix.append(row)
-
+        # 如果数据存在格式错误，则弹窗告错
         if error_total != '':
             self.errorText.setText(error_total)
             self.errorText.append('\n文件导入失败!')
+
+            self.value_temp = {}  # 清除已导入的错误数据
             return
 
         # 二维数据表xy转置成二维list: a天每天记录b种数据 变成 b种数据每种记录a天
         matrix_trans = np.array(matrix).transpose().tolist()
 
-        data = {}
-        index = 0
-        # 去除整列都没有数据的指标
+        enumerate_value = list(enumerate(self.value_temp))
+        matrix_trans_temp = []
+        name_filter = []
+        index = -1
         for a in matrix_trans:
-            if ''.join(a).strip():
-                data.update({titles_final[index]: a})
             index += 1
-        self.value_temp = data
+            s = ('').join(a).strip()
+            if not s:
+                name_filter.append(enumerate_value[index][1])
+                continue
+            matrix_trans_temp.append(a)
+        print(self.value_temp)
+        for a in name_filter:
+            self.value_temp.pop(a)
 
-        success_text = '一级标题行: ' + str(title_1_row+1) + '\n单位行: ' + str(unit_row+1) + '\n数据开始行: ' + str(data_start+1) + '\n备注: ' + str(remark_flag) + '\n\n数据导入成功!'
-        self.errorText.setText(success_text)
+        # 将转置后的二维list依次填进字典的每种"大名称-小名称 单位"中
+        row_count = -1
+        for i in self.value_temp:
+            row_count += 1
+            value_per_col = matrix_trans_temp[row_count]
+            self.value_temp.update({i: value_per_col})
+
+        self.errorText.setText('文件导入成功!')
         self.selectFile.setText(self.filename)
         self.input_change()
 
@@ -347,21 +311,15 @@ class JunoUI(object):
         self.task_window(self.project_table.currentItem().text(), juno)
 
     def task_window(self, project_name, juno):
-        width = 0.3 * self.screen_width
-        height = 0.3 * self.screen_height
-
         juno.setWindowTitle(Version + ' - 命题')
         label = QLabel('添加命题: ')
-        label.setFixedHeight(self.screen_height*0.023)
         self.task_textedit = QTextEdit()
-        self.task_textedit.setFixedHeight(self.screen_height*0.023)
         self.task_textedit.textChanged.connect(partial(self.task_textedit_change, project_name))
         self.submit_task_btn = QPushButton('确定添加')
-        self.submit_task_btn.setFixedHeight(self.screen_height*0.023)
         self.submit_task_btn.clicked.connect(partial(self.task_submit, project_name))
         self.submit_task_btn.setDisabled(True)
         task_input_content = QWidget()
-        task_input_content.setFixedHeight(self.screen_height*0.033)
+        task_input_content.setFixedHeight(42)
         task_input_layout = QHBoxLayout(task_input_content)
         task_input_layout.addWidget(label)
         task_input_layout.addWidget(self.task_textedit)
@@ -370,7 +328,7 @@ class JunoUI(object):
         self.task_table = QTableWidget()
         self.task_table.setColumnCount(1)
         self.task_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        self.task_table.clicked.connect(partial(self.click_config_window, project_name, juno))
+        self.task_table.clicked.connect(partial(self.config_window, project_name, juno))
         self.task_table.verticalHeader().setVisible(False)
         self.task_table.horizontalHeader().setVisible(False)
 
@@ -381,7 +339,7 @@ class JunoUI(object):
         flow_layout.addWidget(task_back_btn)
 
         task_content = QWidget()
-        task_content.setMinimumSize(width, height)
+        task_content.setMinimumSize(400, 300)
         task_layout = QVBoxLayout(task_content)
         task_layout.addWidget(task_input_content)
         task_layout.addWidget(self.task_table)
@@ -391,9 +349,7 @@ class JunoUI(object):
             self.value = json.load(f)
 
         juno.setCentralWidget(task_content)
-        juno.setFixedHeight(height)
-        juno.setFixedWidth(width)
-        # juno.move(self.screen_width/2-width/2, self.screen_height/2-height/2)
+        juno.resize(400, 300)
         self.load_task_table(project_name)
 
     def task_textedit_change(self, project_name):
@@ -434,11 +390,6 @@ class JunoUI(object):
     def task_back_btn(self, juno):
         self.Main_Window(juno)
 
-    def click_config_window(self, project_name, juno):
-        juno.close()
-        juno = QMainWindow()
-        self.config_window(project_name, juno)
-
     def config_window(self, project_name, juno, *task_name_1):
         juno.setWindowTitle(Version + ' - 配置参数')
 
@@ -453,11 +404,11 @@ class JunoUI(object):
         self.situation_table = QTableWidget()
         self.situation_table.setColumnCount(2)
         self.situation_table.verticalHeader().setVisible(False)
-        self.situation_table.setHorizontalHeaderLabels(['情况选择', ''])
+        self.situation_table.setHorizontalHeaderLabels(['指标', ''])
         self.situation_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         situation_content = QWidget()
         situation_layout = QFormLayout(situation_content)
-        situation_layout.addRow(self.situation_combo)
+        situation_layout.addRow("情况选择 ", self.situation_combo)
         situation_layout.addRow(self.situation_table)
 
         self.action_combo = QComboBox()
@@ -466,11 +417,11 @@ class JunoUI(object):
         self.action_table = QTableWidget()
         self.action_table.setColumnCount(2)
         self.action_table.verticalHeader().setVisible(False)
-        self.action_table.setHorizontalHeaderLabels(['行为选择', ''])
+        self.action_table.setHorizontalHeaderLabels(['指标', ''])
         self.action_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         action_content = QWidget()
         action_layout = QFormLayout(action_content)
-        action_layout.addRow(self.action_combo)
+        action_layout.addRow("行为选择 ", self.action_combo)
         action_layout.addRow(self.action_table)
 
         self.result_combo = QComboBox()
@@ -479,21 +430,20 @@ class JunoUI(object):
         self.result_table = QTableWidget()
         self.result_table.setColumnCount(2)
         self.result_table.verticalHeader().setVisible(False)
-        self.result_table.setHorizontalHeaderLabels(['结果选择', ''])
+        self.result_table.setHorizontalHeaderLabels(['指标', ''])
         self.result_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         result_content = QWidget()
         result_layout = QFormLayout(result_content)
-        result_layout.addRow(self.result_combo)
+        result_layout.addRow("结果选择 ", self.result_combo)
         result_layout.addRow(self.result_table)
 
         var_content = QWidget()
-        var_content.setFixedWidth(self.screen_width*0.49)
         var_layout = QHBoxLayout(var_content)
         var_layout.addWidget(situation_content)
         var_layout.addWidget(action_content)
         var_layout.addWidget(result_content)
 
-        cost_table_label = QLabel('成本占比:')
+        cost_table_label = QLabel('成本占比:\n')
         self.cost_table = QTableWidget()
         self.cost_table.setColumnCount(2)
         self.cost_table.verticalHeader().setVisible(False)
@@ -505,13 +455,11 @@ class JunoUI(object):
         cost_table_layout.addWidget(self.cost_table)
 
         config_content_1 = QWidget()
-        config_content_1.setFixedHeight(self.screen_height*0.4)
         config_layout_1 = QHBoxLayout(config_content_1)
         config_layout_1.addWidget(var_content)
         config_layout_1.addWidget(cost_table_content)
 
-        risk_table_label = QLabel('  重要性占比:')
-        risk_table_label.setFixedHeight(self.screen_height*0.029)
+        risk_table_label = QLabel('重要性占比:\n')
         self.risk_table = QTableWidget()
         self.risk_table.setColumnCount(2)
         self.risk_table.verticalHeader().setVisible(False)
@@ -523,16 +471,15 @@ class JunoUI(object):
         risk_table_layout.addWidget(risk_table_label)
         risk_table_layout.addWidget(self.risk_table)
 
-        border_table_label = QLabel('边界设置:')
+        border_table_label = QLabel('边界设置:\n')
         self.border_add_btn = QPushButton('添加边界')
         self.border_add_btn.clicked.connect(self.border_table_add_row)
         self.border_add_btn.setDisabled(True)
-        label_1_content = QWidget()
-        label_1_layout = QHBoxLayout(label_1_content)
-        label_1_layout.addWidget(border_table_label)
-        label_1_layout.addWidget(self.border_add_btn)
+        content = QWidget()
+        layout = QHBoxLayout(content)
+        layout.addWidget(border_table_label)
+        layout.addWidget(self.border_add_btn)
         self.border_table = QTableWidget()
-        self.border_table.setFixedHeight(self.screen_height*0.17)
         self.border_table.setColumnCount(3)
         self.border_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.border_table.cellChanged.connect(self.borber_table_cell_change)
@@ -543,7 +490,7 @@ class JunoUI(object):
         self.border_table_graph_plt = self.border_table_graph.addPlot()
         border_table_content = QWidget()
         border_table_layout = QVBoxLayout(border_table_content)
-        border_table_layout.addWidget(label_1_content)
+        border_table_layout.addWidget(content)
         border_table_layout.addWidget(self.border_table)
         border_table_layout.addWidget(self.border_table_graph)
 
@@ -552,24 +499,18 @@ class JunoUI(object):
         config_layout_2.addWidget(risk_table_content)
         config_layout_2.addWidget(border_table_content)
 
-        begin_label = QLabel('起始时间:')
-        begin_label.setFixedHeight(self.screen_height*0.023)
+        begin_label = QLabel('起始时间')
         self.date_begin = QDateEdit()
-        self.date_begin.setFixedHeight(self.screen_height*0.023)
         self.date_begin.setCalendarPopup(True)
         self.date_begin.setDate(date.fromordinal(int(float(min(self.value['日期']))) + date(1900, 1, 1).toordinal() - 2))
-        end_label = QLabel('   结束时间:')
-        end_label.setFixedHeight(self.screen_height*0.023)
+        end_label = QLabel('结束时间')
         self.date_end = QDateEdit()
-        self.date_end.setFixedHeight(self.screen_height*0.023)
         self.date_end.setCalendarPopup(True)
         self.date_end.setDate(date.fromordinal(int(float(max(self.value['日期']))) + date(1900, 1, 1).toordinal() - 2))
-        label = QLabel('   safety:')
-        label.setFixedHeight(self.screen_height*0.023)
+        label = QLabel('safety')
         self.safety_textedit = QTextEdit('0.5')
-        self.safety_textedit.setFixedHeight(self.screen_height*0.023)
         content_1 = QWidget()
-        content_1.setFixedHeight(self.screen_height*0.033)
+        content_1.setFixedHeight(42)
         layout_1 = QHBoxLayout(content_1)
         layout_1.addWidget(begin_label)
         layout_1.addWidget(self.date_begin)
@@ -656,11 +597,8 @@ class JunoUI(object):
         self.situation_table.setItem(self.situation_table.rowCount() - 1, 0, item)
 
         cancel_button = QPushButton('删除')
-        cancel_button.setObjectName('gwButton')
         cancel_button.clicked.connect(self.situation_combo_cancel)
         self.situation_table.setCellWidget(self.situation_table.rowCount() - 1, 1, cancel_button)
-
-        self.situation_table.resizeRowsToContents()
 
     def situation_combo_cancel(self):
         index = self.situation_table.currentRow()
@@ -719,11 +657,8 @@ class JunoUI(object):
         self.action_table.setItem(self.action_table.rowCount() - 1, 0, item)
 
         cancel_button = QPushButton('删除')
-        cancel_button.setObjectName('gwButton')
         cancel_button.clicked.connect(self.action_combo_cancel)
         self.action_table.setCellWidget(self.action_table.rowCount() - 1, 1, cancel_button)
-
-        self.action_table.resizeRowsToContents()
 
         item = QTableWidgetItem(action_current)
         item.setFlags(QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled)
@@ -803,11 +738,8 @@ class JunoUI(object):
         self.result_table.setItem(self.result_table.rowCount() - 1, 0, item)
 
         cancel_button = QPushButton('删除')
-        cancel_button.setObjectName('gwButton')
         cancel_button.clicked.connect(self.result_combo_cancel)
         self.result_table.setCellWidget(self.result_table.rowCount() - 1, 1, cancel_button)
-
-        self.result_table.resizeRowsToContents()
 
         item = QTableWidgetItem(result_current)
         item.setFlags(QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled)
@@ -1112,7 +1044,7 @@ class JunoUI(object):
         self.table1 = QTableWidget()
         self.table1.verticalHeader().setVisible(False)
         result_1_content = QWidget()
-        result_1_content.setFixedHeight(0.3*self.screen_height)
+        result_1_content.setFixedHeight(400)
         result_1_layout = QVBoxLayout(result_1_content)
         result_1_layout.addWidget(self.table1_label)
         result_1_layout.addWidget(self.table1)
@@ -1237,19 +1169,18 @@ class JunoUI(object):
         result_4_layout.addWidget(self.table9)
 
         tabs = QTabWidget()
-        tabs.setObjectName('gwTab')
         tabs.addTab(self.tab1, '策略概览')
         tabs.addTab(self.tab2, '策略分析依据')
         tabs.addTab(self.tab3, '策略应用')
 
         back_btn = QPushButton('返回')
         back_btn.clicked.connect(partial(self.result_back_to_config, project_name, task_name, juno))
-        back_btn.setFixedHeight(0.0347*self.screen_height)
-        back_btn.setFixedWidth(0.05*self.screen_width)
+        back_btn.setFixedHeight(50)
+        back_btn.setFixedWidth(133)
         export_btn = QPushButton('导出')
         export_btn.clicked.connect(partial(self.export_to_excel, project_name, task_name, result))
-        export_btn.setFixedHeight(0.0347*self.screen_height)
-        export_btn.setFixedWidth(0.05*self.screen_width)
+        export_btn.setFixedHeight(50)
+        export_btn.setFixedWidth(133)
         btn_content = QWidget()
         btn_layout = QHBoxLayout(btn_content)
         btn_layout.addWidget(back_btn)
@@ -1288,7 +1219,7 @@ class JunoUI(object):
         for i in result.risks.keys():
             count += 1
             for j in result.risks[i]['threshold']:
-                table_title.append('Z' + str(count) + ' - ' + i + ' - ' + j)
+                table_title.append('Z' + str(count) + ' - ' + i + '-' + j)
         count = 0
         for i in result.consumptions.keys():
             count += 1
@@ -1298,23 +1229,6 @@ class JunoUI(object):
             count += 1
             table_title.append('Z' + str(count) + ' - ' + i + ' 达标优势(%)')
 
-        self.table1.setColumnCount(len(table_title))
-        self.table1.setRowCount(1)
-
-        index = 0
-        for i in table_title:
-            if '节约率' in i:
-                brush = QtGui.QBrush(QtGui.QColor(76, 140, 255, 255))
-            elif '达标优势' in i:
-                brush = QtGui.QBrush(QtGui.QColor(255, 140, 76, 255))
-            else:
-                brush = QtGui.QBrush(QtGui.QColor(0, 0, 0, 255))
-            brush.setStyle(QtCore.Qt.SolidPattern)
-            item = QTableWidgetItem(i)
-            item.setForeground(brush)
-            self.table1.setHorizontalHeaderItem(index, item)
-            index += 1
-
         value = []
         for i in result.risks.keys():
             for j in result.risks[i]['threshold']:
@@ -1323,13 +1237,16 @@ class JunoUI(object):
             value.append(round(result.consumptions[i]['saving_rate'], 2))
         for i in result.risks.keys():
             value.append(round(result.risks[i]['ai_advantage'], 2))
+
+        self.table1.setColumnCount(len(table_title))
+        self.table1.setHorizontalHeaderLabels(table_title)
+        self.table1.resizeColumnsToContents()
+        self.table1.setRowCount(1)
         for i in range(len(value)):
             item = QTableWidgetItem(str(value[i]))
             item.setFlags(QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled)
             item.setTextAlignment(QtCore.Qt.AlignCenter)
             self.table1.setItem(0, i, item)
-
-        self.table1.resizeColumnsToContents()
 
     def load_table2(self, result):
         self.table2.setColumnCount(3)
@@ -1626,8 +1543,6 @@ class JunoUI(object):
                 self.table5.setItem(self.table5.rowCount() - 1, count, item)
                 count += 1
 
-        # self.table5.resizeColumnToContents(0)
-
     def load_table6(self, result):
         self.table6.setColumnCount(3)
         self.table6.setHorizontalHeaderLabels(['结果变量', '历史超标率(%)', 'AI超标率(%)'])
@@ -1648,8 +1563,6 @@ class JunoUI(object):
                 item.setTextAlignment(QtCore.Qt.AlignCenter)
                 self.table6.setItem(self.table6.rowCount() - 1, count, item)
                 count += 1
-
-        # self.table6.resizeColumnToContents(0)
 
     def load_table7(self, result):
         self.table7.setRowCount(len(self.config_data['situation']) + 2)
@@ -1903,8 +1816,8 @@ class JunoUI(object):
 
     def export_to_excel(self, project_name, task_name, result):
         str = "./JunoProject/" + project_name + "/Output/"
-        str_image_1 = "./JunoProject/" + project_name + "/Output/" + task_name + "/人机策略分布"
-        str_image_2 = "./JunoProject/" + project_name + "/Output/" + task_name + "/两色散点图"
+        str_image_1 = "./JunoProject/" + project_name + "/Output/Image/人机策略分布"
+        str_image_2 = "./JunoProject/" + project_name + "/Output/Image/两色散点图"
         if not os.path.isdir(str):
             os.makedirs(str)
         if not os.path.isdir(str_image_1):
@@ -1918,8 +1831,7 @@ class JunoUI(object):
         for i in self.graph1_combo_value:
             self.graph1_combo.setCurrentText(i)
             self.graph1_combo_change(result)
-            a = 'JunoProject/' + project_name + '/Output/' + task_name + '/人机策略分布/' + i.replace(' ', '').replace('/', '') +'.png'
-            self.plt1.enableAutoRange()
+            a = 'JunoProject/' + project_name + '/Output/Image/两色散点图/' + i.replace(' ', '').replace('/', '') +'.png'
             pyqtgraph.exporters.ImageExporter(self.plt1).export(fileName=a)
         for i in self.graph2_combo_value:
             for j in self.graph2_combo_value:
@@ -1927,8 +1839,7 @@ class JunoUI(object):
                     self.graph2_combo_x.setCurrentText(i)
                     self.graph2_combo_y.setCurrentText(j)
                     self.graph2_combo_change(result)
-                    a = 'JunoProject/' + project_name + '/Output/' + task_name + '/两色散点图/' + i.replace(' ', '').replace('/', '').split('(')[0] + '&' + j.replace(' ', '').replace('/', '').split('(')[0] +'.png'
-                    self.graph2.getPlotItem().enableAutoRange()
+                    a = 'JunoProject/' + project_name + '/Output/Image/人机策略分布/' + i.replace(' ', '').replace('/', '').split('(')[0] + '&' + j.replace(' ', '').replace('/', '').split('(')[0] +'.png'
                     pyqtgraph.exporters.ImageExporter(self.graph2.plotItem).export(fileName=a)
         self.graph1_combo.setCurrentText(current_graph1_combo)
         self.graph1_combo_change(result)
@@ -1936,7 +1847,7 @@ class JunoUI(object):
         self.graph2_combo_y.setCurrentText(current_graph2_combo_y)
         self.graph2_combo_change(result)
 
-        xlsx = xlsxwriter.Workbook(str + task_name + '/table.xlsx')
+        xlsx = xlsxwriter.Workbook(str + task_name + '.xlsx')
         text_format = xlsx.add_format({'text_wrap': 'True'})
 
         table_1 = xlsx.add_worksheet('各种边界的AI策略结果')
@@ -2021,33 +1932,16 @@ class JunoUI(object):
 
 
 if __name__ == '__main__':
-    QApplication.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling)
+   
+    
     app = QApplication(sys.argv)
+    app.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling)
+    app.setStyle('Fusion')
+    # dark_stylesheet = qdarkstyle.load_stylesheet(qt_api='pyqt5')
+    # app.setStyleSheet(dark_stylesheet)
     app.setStyleSheet(open('qt_dark.css').read())
-
-    # app.setStyle('Fusion')
-    # palette = QPalette()
-    # palette.setColor(QPalette.Window, QColor(24,26,24))
-    # palette.setColor(QPalette.WindowText, Qt.white)
-    # palette.setColor(QPalette.Base, QColor(52,54,52))
-    # palette.setColor(QPalette.AlternateBase, QColor(24,26,24))
-    # palette.setColor(QPalette.ToolTipBase, Qt.black)
-    # palette.setColor(QPalette.ToolTipText, Qt.white)
-    # palette.setColor(QPalette.Text, Qt.white)
-    # palette.setColor(QPalette.Button, QColor(24,26,24))
-    # palette.setColor(QPalette.ButtonText, Qt.white)
-    # palette.setColor(QPalette.BrightText, Qt.red)
-    # palette.setColor(QPalette.Link, QColor(42, 130, 218))
-    # palette.setColor(QPalette.Highlight, QColor(42, 130, 218))
-    # palette.setColor(QPalette.HighlightedText, Qt.black)
-    # app.setPalette(palette)
-    
-    
-    current_screen_width = app.desktop().screenGeometry().width()
-    current_screen_height = app.desktop().screenGeometry().height()
     MainWindow = QMainWindow()
-    window = JunoUI(MainWindow, current_screen_width, current_screen_height)
+    window = JunoUI(MainWindow)
     MainWindow.show()
-    # sys.exit(app.exec_())
     app.exec_()
     app.quit()
