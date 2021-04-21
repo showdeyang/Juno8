@@ -656,6 +656,7 @@ class JunoUI(object):
         self.situation_table.setItem(self.situation_table.rowCount() - 1, 0, item)
 
         cancel_button = QPushButton('删除')
+        cancel_button.setObjectName('gwButton')
         cancel_button.clicked.connect(self.situation_combo_cancel)
         self.situation_table.setCellWidget(self.situation_table.rowCount() - 1, 1, cancel_button)
 
@@ -718,6 +719,7 @@ class JunoUI(object):
         self.action_table.setItem(self.action_table.rowCount() - 1, 0, item)
 
         cancel_button = QPushButton('删除')
+        cancel_button.setObjectName('gwButton')
         cancel_button.clicked.connect(self.action_combo_cancel)
         self.action_table.setCellWidget(self.action_table.rowCount() - 1, 1, cancel_button)
 
@@ -801,6 +803,7 @@ class JunoUI(object):
         self.result_table.setItem(self.result_table.rowCount() - 1, 0, item)
 
         cancel_button = QPushButton('删除')
+        cancel_button.setObjectName('gwButton')
         cancel_button.clicked.connect(self.result_combo_cancel)
         self.result_table.setCellWidget(self.result_table.rowCount() - 1, 1, cancel_button)
 
@@ -1234,6 +1237,7 @@ class JunoUI(object):
         result_4_layout.addWidget(self.table9)
 
         tabs = QTabWidget()
+        tabs.setObjectName('gwTab')
         tabs.addTab(self.tab1, '策略概览')
         tabs.addTab(self.tab2, '策略分析依据')
         tabs.addTab(self.tab3, '策略应用')
@@ -2044,4 +2048,6 @@ if __name__ == '__main__':
     MainWindow = QMainWindow()
     window = JunoUI(MainWindow, current_screen_width, current_screen_height)
     MainWindow.show()
-    sys.exit(app.exec_())
+    # sys.exit(app.exec_())
+    app.exec_()
+    app.quit()

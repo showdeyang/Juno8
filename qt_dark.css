@@ -26,6 +26,34 @@
 	background: #191919;
 	color: #DDDDDD;
 	border: 1px solid #5A5A5A;
+	
+}
+
+
+#gwButton {
+	border: none;
+}
+
+#gwTab {
+	border: 1px;
+	border-radius: 5px
+}
+
+
+QPushButton {
+	width: 100px;
+	height: 50px;
+}
+
+
+
+QTableWidget {
+	border-radius: 0px;
+	
+}
+
+QWidget.QWidget {
+	border: none;
 }
 
 QWidget::item:selected {
@@ -149,10 +177,12 @@ QScrollBar::add-page, QScrollBar::sub-page {
 
 QAbstractButton:hover {
 	background: #353535;
+	border-radius: 2px
 }
 
 QAbstractButton:pressed {
 	background: #5A5A5A;
+border-radius: 2px
 }
 
 QAbstractItemView {
@@ -163,7 +193,7 @@ QAbstractItemView {
 }
 
 QHeaderView {
-	border: 1px solid #5A5A5A;
+	border: 0px solid #5A5A5A;
 }
 
 QHeaderView::section {
@@ -182,10 +212,11 @@ QTableView {
 
 QTabBar {
 	margin-left: 2px;
+border-radius: 10px;
 }
 
 QTabBar::tab {
-	border-radius: 0px;
+	border-radius: 10px;
 	padding: 4px;
 	margin: 4px;
 }
@@ -201,6 +232,7 @@ QComboBox::down-arrow {
 
 QComboBox::drop-down {
 	border: 1px solid #5A5A5A;
+	border-radius: 5px;
 	background: #353535;
 }
 
