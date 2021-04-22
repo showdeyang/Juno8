@@ -1939,7 +1939,7 @@ if __name__ == '__main__':
     app.setStyle('Fusion')
     # dark_stylesheet = qdarkstyle.load_stylesheet(qt_api='pyqt5')
     # app.setStyleSheet(dark_stylesheet)
-    app.setStyleSheet(open('qt_dark.css').read())
+    app.setStyleSheet(open('QSS\\yast.qss', encoding='utf-8').read())
     MainWindow = QMainWindow()
     window = JunoUI(MainWindow)
     MainWindow.show()
