@@ -6,7 +6,7 @@ from pathlib import Path
 import sklearn
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.neighbors import KNeighborsRegressor
-from sklearn.linear_model import BayesianRidge
+# from sklearn.linear_model import BayesianRidge
 import sklearn.utils._cython_blas
 import sklearn.neighbors._typedefs
 import sklearn.tree
@@ -14,11 +14,14 @@ import sklearn.tree._utils
 import platform
 from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import Pipeline
-from sklearn.svm import SVR
-import time
-from sklearn.decomposition import PCA
+# from sklearn.svm import SVR
+# import time
+# from sklearn.decomposition import PCA
 import warnings
-
+# from numba import jit
+# from multiprocessing import Pool
+from sklearn.impute import KNNImputer
+import time
 
 if not sys.warnoptions:
     warnings.simplefilter("ignore")
@@ -42,8 +45,16 @@ def readJsonData(dataPath):
     dt = {key: [(i, float(value)) for i, value in enumerate(d[key]) if value] for key in d}
     return dt
 
+def gr(args):
+    x = args[0]
+    t = args[1]
+    ts = (1/(np.abs((np.array([r[0] for r in x]) - t)+1e-4)))**2
+    ps = ts/np.sum(ts)
+    xs = np.array([r[1] for r in x])
+    rx = np.dot(xs, ps)
+    return rx
 
-def knnRegress(X, maxT=None, n_points=2000, strength=0, locality=16.5):
+def knnRegress2(X, maxT=None, n_points=2000, strength=0, locality=16.5):
     T = []
     for x in X:
         T += [r[0] for r in x]
@@ -58,30 +69,78 @@ def knnRegress(X, maxT=None, n_points=2000, strength=0, locality=16.5):
     
     Ts = [int(v) for v in np.linspace(minT, maxT, n_points+1)]
     trX = []
+    
+   
+    
     for t in Ts:
-        trx = []
-        for x in X:
-            ts = (1/(np.abs((np.array([r[0] for r in x]) - t)+1e-4)))**2
-            ps = ts/np.sum(ts)
-            xs = np.array([r[1] for r in x])
-            rx = np.dot(xs, ps)
-            trx.append(rx)
+        args = [(x,t) for x in X]
+        # with Pool(5) as p:
+        #     trx = p.map(gr, args)
         
-        trx = np.array(trx)
-        for i in range(strength):
-            trX.append(np.abs(np.exp(np.random.normal(np.log(trx), np.abs(np.log(trx))/locality))))
+        trx = list(map(gr, args))
+        
+            # print(p.map(f, [1, 2, 3]))
+        
+        # for x in X:
+        #     ts = (1/(np.abs((np.array([r[0] for r in x]) - t)+1e-4)))**2
+        #     ps = ts/np.sum(ts)
+        #     xs = np.array([r[1] for r in x])
+        #     rx = np.dot(xs, ps)
+        #     trx = np.append(trx, rx).reshape(-1, *rx.shape)
+        # print(trx.shape)
+        # trx = np.array(trx)
+        # for i in range(strength):
+        #     trX = np.append(trX, np.abs(np.exp(np.random.normal(np.log(trx), np.abs(np.log(trx))/locality))))
         trX.append(trx)
     
     trX = np.array(trX)
     Ts *= (strength + 1)
     
     Ts = np.array(Ts)
-    
+    print(trX.shape)
     resX = np.array([list(zip(Ts, x)) for x in trX.T])
 
     # print('resX', resX.shape)
     return resX
 
+def knnRegress(X, n_points=2000):
+    print(len(X))
+    T = []
+    for x in X:
+        T += [r[0] for r in x]
+    
+    T = list(set(T))
+    minT = 0
+    maxT = int(max(T))
+    
+    n_points = min(int(maxT-minT), n_points)    
+    
+    Ts = [int(v) for v in np.linspace(minT, maxT, n_points+1)]
+    
+    trX = []
+    for x in X:
+        if x:
+            rx = x
+            for t in Ts:
+                if t not in [x[0] for x in x]:
+                    rx.append([t, np.nan])
+        else:
+            rx = [[t, -1] for t in Ts]
+        trX.append(rx)
+    
+    trX = np.array(trX)
+    
+    inX = trX[:, :, 1].T
+    
+    imputer = KNNImputer()
+    xnew = imputer.fit_transform(inX)
+    xnew = xnew.T
+    xnew = [[[Ts[i], x] for i,x in enumerate(xcol)] for xcol in xnew]
+    xnew = np.array(xnew)
+    
+    return xnew
+    
+    
 
 def polyFit(x, y, deg=3, xPolicy=-70, yPolicy=70, partitions=10):
     T = []
@@ -329,7 +388,6 @@ def efficacy(trX, strat, T, thresholds, typeDefs=None, startIndex=0, endIndex=No
     
     X = trX[xinds, :, 1]
     Y = trX[yinds, :, 1]
-    XY = trX[xyinds, :, 1]
     Z = trX[zinds, :, 1]
     
     decisions = strat(trX[xinds, :, 1].T)
@@ -415,13 +473,13 @@ def efficacy(trX, strat, T, thresholds, typeDefs=None, startIndex=0, endIndex=No
     
     return decisions, predZ, consumptions, risks
 
-def knnR(data, time_dimension=False):
+def knnR(data, time_dimension=True):
     t1 = time.time()
     print('Regressing data... This may take a while...')
     trX = knnRegress([data[feature] for feature in  data])
     
     if not time_dimension:
-        trX = trX[:,:,1]
+        trX = trX[:,:, 1]
     
     print('Regressing time:', time.time()-t1)
     print('Encoding time dimension?', time_dimension)
@@ -436,12 +494,12 @@ class analysis:
         t1 = time.time()
         xinds = [i for i, td in enumerate(typeDefs) if td < 0]
         yinds = [i for i, td in enumerate(typeDefs) if 0 <= td <= 1]
-        xyinds = [i for i, td in enumerate(typeDefs) if td < 2]
+        # xyinds = [i for i, td in enumerate(typeDefs) if td < 2]
         zinds = [i for i, td in enumerate(typeDefs) if td >= 2]
         
         txs = [data[feature] for feature in inputVars + controlVars + outputVars]
         maxT = np.max(np.array([data[feature] for feature in data][0])[:, 0])
-        self.trX = knnRegress(txs, maxT=maxT, strength=0)
+        self.trX = knnRegress(txs)
         
         X = self.trX[xinds, :, 1].T
         Y = self.trX[yinds, :, 1].T
@@ -515,7 +573,7 @@ if __name__ == '__main__':
     import json
     import time
     from matplotlib import pyplot as plt
-
+    plt.style.use('dark_background')
     data = readJsonData(path / 'JunoProject' / '示例项目' / 'value.json')
     
     inputVars = ['二沉池混合后-TP (mg/L)', '二沉池混合后-SS (mg/L)']
@@ -539,5 +597,7 @@ if __name__ == '__main__':
 
     ##########################
     
-    # trX = knnR(data)
-    plt.hist(A.trX[2,:, 1])
+    trX = knnR(data)
+    plt.hist(A.trX[2, :,1])
+    plt.show()
+    plt.hist(trX[171,:, 1])
