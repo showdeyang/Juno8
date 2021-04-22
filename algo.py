@@ -1,11 +1,13 @@
 # -*- coding: utf-8 -*-
 import numpy as np
 import sys
+import math
 import random
 from pathlib import Path
 import sklearn
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.neighbors import KNeighborsRegressor
+from sklearn.multioutput import MultiOutputRegressor
 # from sklearn.linear_model import BayesianRidge
 import sklearn.utils._cython_blas
 import sklearn.neighbors._typedefs
@@ -22,6 +24,8 @@ import warnings
 # from multiprocessing import Pool
 from sklearn.impute import KNNImputer
 import time
+import json
+from matplotlib import pyplot as plt
 
 if not sys.warnoptions:
     warnings.simplefilter("ignore")
@@ -105,34 +109,46 @@ def knnRegress2(X, maxT=None, n_points=2000, strength=0, locality=16.5):
 
 def knnRegress(X, n_points=2000):
     print(len(X))
+    # X = np.array([[[v] for v in x] for x in X ])
+    
+    
+    
     T = []
+    # print(X[2][:20])
     for x in X:
         T += [r[0] for r in x]
-    
-    T = list(set(T))
+    # print(T)
+    # T = list(set(T))
     minT = 0
-    maxT = int(max(T))
+    maxT = math.ceil(max(T))
+    print('maxT', maxT)
     
-    n_points = min(int(maxT-minT), n_points)    
+    n_points = min(maxT-minT, n_points)    
     
     Ts = [int(v) for v in np.linspace(minT, maxT, n_points+1)]
-    
+    # print(Ts)
     trX = []
     for x in X:
         if x:
             rx = x
+            # print('rx', rx)
             for t in Ts:
-                if t not in [x[0] for x in x]:
-                    rx.append([t, np.nan])
+                # print([x[0] for x in x])
+                if t not in [r[0] for r in x]:
+                    rx.append((t, np.nan))
+                
         else:
-            rx = [[t, -1] for t in Ts]
+            # print('empty x detected')
+            rx = [(t, -1) for t in Ts]
+        rx = sorted(rx, key=lambda v: v[0])   
+        # print('new rx', rx)
         trX.append(rx)
     
     trX = np.array(trX)
     
     inX = trX[:, :, 1].T
-    
-    imputer = KNNImputer()
+    # print(inX)
+    imputer = KNNImputer(n_neighbors=n_points, weights='distance')
     xnew = imputer.fit_transform(inX)
     xnew = xnew.T
     xnew = [[[Ts[i], x] for i,x in enumerate(xcol)] for xcol in xnew]
@@ -326,10 +342,11 @@ def strategy(trX, thresholds=None, typeDefs=None, safety=1):
     XY = trX[xyinds, :, 1].T
     Z = trX[zinds, :, 1].T
     
-    #pipe = Pipeline([('scaler', StandardScaler()), ('knn', KNeighborsRegressor())])
+    pipe0 = Pipeline([('scaler', StandardScaler()), ('knn', KNeighborsRegressor())])
     
-    model = [RandomForestRegressor(n_estimators=30).fit(XY, z) for z in Z.T]
-    T = lambda xy: np.array([regr.predict(xy) for regr in model]).T
+    # model = [RandomForestRegressor(n_estimators=30).fit(XY, z) for z in Z.T]
+    pipe0.fit(XY, Z)
+    T = lambda xy: pipe0.predict(xy)
     
     THR = np.array([[[float(thresh.replace('q', '').replace("%", ''))/100, threshold[thresh]] for thresh in threshold] for threshold in thresholds], dtype=object)
 
@@ -345,9 +362,9 @@ def strategy(trX, thresholds=None, typeDefs=None, safety=1):
     def L(X, Y, safety):
         return (1 - safety) * J(Y) + safety * R(T([[*(X[i][xinds]), *y] for i, y in enumerate(Y)])) + 0.0001
     
-    pipe = Pipeline([('scaler', StandardScaler()), ('knn', KNeighborsRegressor())])
+    pipe1 = Pipeline([('scaler', StandardScaler()), ('knn', KNeighborsRegressor())])
     # pipe = Pipeline([('scaler', StandardScaler()),('pca', PCA()),  ('knn', KNeighborsRegressor())])
-    lossModel = pipe.fit([[*(X[i][xinds]), *y] for i, y in enumerate(Y)], L(X, Y, safety=safety))
+    lossModel = pipe1.fit([[*(X[i][xinds]), *y] for i, y in enumerate(Y)], L(X, Y, safety=safety))
 
     def localLoss(x):
         # xin = [[*(np.multiply(x, np.ones(Y.shape))[i][xinds]), *y] for i, y in enumerate(Y)]
@@ -364,10 +381,11 @@ def strategy(trX, thresholds=None, typeDefs=None, safety=1):
     
     X1,Y1 = np.array(X[rinds]), np.array(Y1)
     # print(Y1[:20])
-    # pipe = Pipeline([('scaler', StandardScaler()), ('knn', BayesianRidge())])
+    pipe2 = Pipeline([('scaler', StandardScaler()), ('knn', KNeighborsRegressor())])
     
-    strat = [RandomForestRegressor(n_estimators=30).fit(X1, y) for y in Y1.T]
-    S = lambda x: np.array([regr.predict(x) for regr in strat]).T
+    # strat = [RandomForestRegressor(n_estimators=30).fit(X1, y) for y in Y1.T]
+    pipe2.fit(X1, Y1)
+    S = lambda x: pipe2.predict(x)
     
     return S, T
     
@@ -498,7 +516,7 @@ class analysis:
         zinds = [i for i, td in enumerate(typeDefs) if td >= 2]
         
         txs = [data[feature] for feature in inputVars + controlVars + outputVars]
-        maxT = np.max(np.array([data[feature] for feature in data][0])[:, 0])
+        #maxT = np.max(np.array([data[feature] for feature in data][0])[:, 0])
         self.trX = knnRegress(txs)
         
         X = self.trX[xinds, :, 1].T
@@ -533,9 +551,10 @@ class analysis:
         print('time taken', t2-t1)
         
     def train(self):  # opt 机器
-        # pipe = Pipeline([('scaler', StandardScaler()), ('knn', KNeighborsRegressor())])
-        strat = [RandomForestRegressor(n_estimators=30).fit(self.X, y) for y in self.Y.T]
-        self.S_hm = lambda x: np.array([regr.predict(x) for regr in strat]).T
+        pipe3 = Pipeline([('scaler', StandardScaler()), ('knn', KNeighborsRegressor())])
+        # strat = [RandomForestRegressor(n_estimators=30).fit(self.X, y) for y in self.Y.T]
+        strat = pipe3.fit(self.X, self.Y)
+        self.S_hm = lambda x: strat.predict(x)
 
         self.S, self.T = strategy(self.trX, thresholds=self.thresholds, typeDefs=self.typeDefs, safety=self.safety)
         self.Yopt, self.Zopt, consumptions, risks = efficacy(self.trX, strat=self.S, T=self.T, typeDefs=self.typeDefs, thresholds=self.thresholds, startIndex=self.startIndex, endIndex=self.endIndex, verbose=self.verbose)
@@ -570,9 +589,7 @@ class analysis:
 
 if __name__ == '__main__':
     # plt.style.use('dark_background')
-    import json
-    import time
-    from matplotlib import pyplot as plt
+
     plt.style.use('dark_background')
     data = readJsonData(path / 'JunoProject' / '示例项目' / 'value.json')
     
