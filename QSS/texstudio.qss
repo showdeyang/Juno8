@@ -168,14 +168,14 @@ QScrollBar:horizontal {
 	height: 25px;
 	margin: 3px 27px 3px 27px;
 	border: 1px transparent #2A2929;
-	border-radius: 4px;
+	border-radius: 0px;
 	background-color: #000000;
 }
 
 QScrollBar::handle:horizontal {
 	background-color: #76797C;
 	min-width: 15px;
-	border-radius: 4px;
+	border-radius: 0px;
 }
 
 QScrollBar::add-line:horizontal {
@@ -229,13 +229,13 @@ QScrollBar:vertical {
 	width: 25px;
 	margin: 27px 3px 27px 3px;
 	border: 1px solid #2A2929;
-	border-radius: 4px;
+	border-radius: 0px;
 }
 
 QScrollBar::handle:vertical {
 	background-color: #76797C;
 	min-height: 15px;
-	border-radius: 4px;
+	border-radius: 0px;
 }
 
 QScrollBar::sub-line:vertical {
@@ -331,8 +331,8 @@ QTabBar::tab:top {
 	background-color: #31363b;
 	padding: 5px;
 	min-width: 50px;
-	border-top-left-radius: 6px;
-	border-top-right-radius: 6px;
+	border-top-left-radius: 0px;
+	border-top-right-radius: 0px;
 }
 
 QTabBar::tab:top:selected {
@@ -340,8 +340,8 @@ QTabBar::tab:top:selected {
 	background-color: #54575B;
 	border: 2px solid #76797C;
 	border-bottom: 3px solid #3daee9;
-	border-top-left-radius: 6px;
-	border-top-right-radius: 6px;
+	border-top-left-radius: 0px;
+	border-top-right-radius: 0px;
 }
 
 QTabBar::tab:top:!selected:hover {
@@ -356,8 +356,8 @@ QTabBar::tab:bottom {
 	border-top: 1px transparent black;
 	background-color: #31363b;
 	padding: 5px;
-	border-bottom-left-radius: 6px;
-	border-bottom-right-radius: 6px;
+	border-bottom-left-radius: 1px;
+	border-bottom-right-radius: 1px;
 	min-width: 50px;
 }
 
@@ -366,8 +366,8 @@ QTabBar::tab:bottom:selected {
 	background-color: #54575B;
 	border: 2px solid #76797C;
 	border-top: 3px solid #3daee9;
-	border-bottom-left-radius: 6px;
-	border-bottom-right-radius: 6px;
+	border-bottom-left-radius: 0px;
+	border-bottom-right-radius: 0px;
 }
 
 QTabBar::tab:bottom:!selected:hover {
@@ -535,7 +535,7 @@ QPushButton {
 	border-color: #76797C;
 	border-style: solid;
 	padding: 5px;
-	border-radius: 2px;
+	border-radius: 0px;
 	outline: none;
 }
 
@@ -548,7 +548,7 @@ QPushButton:disabled {
 	padding-bottom: 5px;
 	padding-left: 10px;
 	padding-right: 10px;
-	border-radius: 2px;
+	border-radius: 0px;
 	color: #454545;
 }
 
@@ -582,7 +582,7 @@ QComboBox
 QComboBox {
 	selection-background-color: #db1c49;
 	border: 1px solid #76797C;
-	border-radius: 2px;
+	border-radius: 0px;
 	padding: 5px;
 	min-width: 75px;
 }
@@ -607,7 +607,7 @@ QComboBox:on {
 
 QComboBox QAbstractItemView {
 	background-color: #232629;
-	border-radius: 2px;
+	border-radius: 0px;
 	border: 1px solid #76797C;
 	selection-background-color: #18465d;
 }
@@ -757,7 +757,7 @@ QDialog QToolButton { /*Same as QPushButton*/
 	border-color: #76797C;
 	border-style: solid;
 	padding: 5px;
-	border-radius: 2px;
+	border-radius: 0px;
 	outline: none;
 }
 
@@ -806,7 +806,7 @@ QSlider::handle:vertical {
 	border: 1px solid #db1c49;
 	width: 10px;
 	height: 15px;
-	border-radius: 8px;
+	border-radius: 0px;
 }
 
 QSlider::handle:horizontal:hover,

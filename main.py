@@ -809,7 +809,7 @@ class JunoUI(object):
         border_name = self.risk_table.item(row_count, 0).text()
 
         self.border_table_graph_plt.clear()
-        self.border_table_graph_plt.addLegend(brush=(255, 255, 255, 120), labelTextColor='555', pen={'color': "ccc", 'width': 1})
+        self.border_table_graph_plt.addLegend(brush=(255, 255, 255, 120), labelTextColor='222', pen={'color': "ccc", 'width': 1})
         border_data = self.value[border_name]
         border_data_1 = []
         for i in border_data:
@@ -1315,7 +1315,7 @@ class JunoUI(object):
 
     def graph1_combo_change(self, result):
         self.plt1.clear()
-        self.plt1.addLegend(brush=(255, 255, 255, 120), labelTextColor='555', pen={'color': "ccc", 'width': 1})
+        self.plt1.addLegend(brush=(255, 255, 255, 120), labelTextColor='222', pen={'color': "ccc", 'width': 1})
 
         select_text = self.graph1_combo.currentText()
 
@@ -1375,7 +1375,7 @@ class JunoUI(object):
         self.graph2.setTitle(x + " 和 " + y + " 之间的关系")
         self.graph2.setLabel('left', y)
         self.graph2.setLabel('bottom', x)
-        self.graph2.addLegend(brush=(255, 255, 255, 120), labelTextColor='555', pen={'color': "ccc", 'width': 1})
+        self.graph2.addLegend(brush=(255, 255, 255, 120), labelTextColor='222', pen={'color': "ccc", 'width': 1})
 
         axis_x_hm = []
         axis_x_ai = []
@@ -1939,9 +1939,13 @@ if __name__ == '__main__':
     app.setStyle('Fusion')
     # dark_stylesheet = qdarkstyle.load_stylesheet(qt_api='pyqt5')
     # app.setStyleSheet(dark_stylesheet)
-    app.setStyleSheet(open('QSS\\yast.qss', encoding='utf-8').read())
+    app.setStyleSheet(open('QSS\\texstudio.qss', encoding='utf-8').read())
+    
+    
+    
     MainWindow = QMainWindow()
     window = JunoUI(MainWindow)
+    # MainWindow.setWindowFlags(QtCore.Qt.FramelessWindowHint)
     MainWindow.show()
     app.exec_()
     app.quit()

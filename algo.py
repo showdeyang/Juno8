@@ -18,13 +18,14 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import Pipeline
 # from sklearn.svm import SVR
 # import time
-# from sklearn.decomposition import PCA
+from sklearn.decomposition import PCA
 import warnings
-# from numba import jit
+from numba import jit
 # from multiprocessing import Pool
 from sklearn.impute import KNNImputer
 import time
 import json
+import functools
 from matplotlib import pyplot as plt
 
 if not sys.warnoptions:
@@ -49,70 +50,17 @@ def readJsonData(dataPath):
     dt = {key: [(i, float(value)) for i, value in enumerate(d[key]) if value] for key in d}
     return dt
 
-def gr(args):
-    x = args[0]
-    t = args[1]
-    ts = (1/(np.abs((np.array([r[0] for r in x]) - t)+1e-4)))**2
-    ps = ts/np.sum(ts)
-    xs = np.array([r[1] for r in x])
-    rx = np.dot(xs, ps)
-    return rx
+def var2ind(var, data):
+    features = list(data.keys())
+    return features.index(var)
 
-def knnRegress2(X, maxT=None, n_points=2000, strength=0, locality=16.5):
-    T = []
-    for x in X:
-        T += [r[0] for r in x]
-    
-    T = list(set(T))
-    minT = 0
-    if maxT:
-        maxT = maxT
-    else:
-        maxT = int(max(T))
-    n_points = min(int(maxT-minT), n_points)    
-    
-    Ts = [int(v) for v in np.linspace(minT, maxT, n_points+1)]
-    trX = []
-    
-   
-    
-    for t in Ts:
-        args = [(x,t) for x in X]
-        # with Pool(5) as p:
-        #     trx = p.map(gr, args)
-        
-        trx = list(map(gr, args))
-        
-            # print(p.map(f, [1, 2, 3]))
-        
-        # for x in X:
-        #     ts = (1/(np.abs((np.array([r[0] for r in x]) - t)+1e-4)))**2
-        #     ps = ts/np.sum(ts)
-        #     xs = np.array([r[1] for r in x])
-        #     rx = np.dot(xs, ps)
-        #     trx = np.append(trx, rx).reshape(-1, *rx.shape)
-        # print(trx.shape)
-        # trx = np.array(trx)
-        # for i in range(strength):
-        #     trX = np.append(trX, np.abs(np.exp(np.random.normal(np.log(trx), np.abs(np.log(trx))/locality))))
-        trX.append(trx)
-    
-    trX = np.array(trX)
-    Ts *= (strength + 1)
-    
-    Ts = np.array(Ts)
-    print(trX.shape)
-    resX = np.array([list(zip(Ts, x)) for x in trX.T])
+def ind2var(ind, data):
+    features = list(data.keys())
+    return features[ind]
 
-    # print('resX', resX.shape)
-    return resX
 
 def knnRegress(X, n_points=2000):
-    print(len(X))
-    # X = np.array([[[v] for v in x] for x in X ])
-    
-    
-    
+    # print(len(X))
     T = []
     # print(X[2][:20])
     for x in X:
@@ -121,7 +69,7 @@ def knnRegress(X, n_points=2000):
     # T = list(set(T))
     minT = 0
     maxT = math.ceil(max(T))
-    print('maxT', maxT)
+    # print('maxT', maxT)
     
     n_points = min(maxT-minT, n_points)    
     
@@ -156,69 +104,6 @@ def knnRegress(X, n_points=2000):
     
     return xnew
     
-    
-
-def polyFit(x, y, deg=3, xPolicy=-70, yPolicy=70, partitions=10):
-    T = []
-    for t, v in x:
-        if t in [y[0] for y in y]:
-            T.append(t)
-    tx, ty = [x[1] for x in x if x[0] in T], [y[1] for y in y if y[0] in T]
-
-    if not tx:
-        return None, 0, [], []
-
-    if xPolicy == 0 and yPolicy == 0:
-        TX, TY = tx, ty
-    else:
-        filteredPoints = []
-        rawpoints = list(zip(tx, ty))
-
-        L = (max(tx) - min(tx))/partitions
-        for i in range(partitions):
-            ax = min(tx) + i*L
-            bx = ax + L
-            S = [point for point in rawpoints if ax <= point[0] <= bx]
-            if yPolicy >= 0:
-                s = [point for point in S if point[1] >= np.percentile([v[1] for v in S], yPolicy)]
-            else:
-                s = [point for point in S if point[1] <= np.percentile([v[1] for v in S], 100+yPolicy)]
-            filteredPoints += s
-
-        L = (max(ty) - min(ty))/partitions
-        for i in range(partitions):
-            ay = min(ty) + i*L
-            by = ay + L
-            S = [point for point in rawpoints if ay <= point[1] <= by]
-            if xPolicy >= 0:
-                s = [point for point in S if point[0] >= np.percentile([v[0] for v in S], xPolicy)]
-            else:
-                s = [point for point in S if point[0] <= np.percentile([v[0] for v in S], 100+xPolicy)]
-            filteredPoints += s
-        TX, TY = list(zip(*filteredPoints))
-
-    pcoefs = np.polyfit(TX, TY, min(len(T), deg))
-
-    p = np.poly1d(pcoefs)
-    n = 100
-    zx = [min(tx) + (max(tx)-min(tx))*i/n for i in range(n)]
-    ypreds = p(zx)
-    r2s = sklearn.metrics.r2_score(y_true=TY, y_pred=p(TX))
-    r2s *= (1 - 1/len(T)**0.5)
-    r2s = round(np.nan_to_num(r2s, copy=True, nan=0.0, posinf=None, neginf=None), 4)
-    return p, r2s, zx, ypreds
-
-
-def polyfitFeatureImportances(yvar, data):
-    results = {}
-    for xvar in data:
-        if xvar == yvar:
-            continue
-        x, y = data[xvar], data[yvar]
-        p, r2s, zx, ypreds = polyFit(x, y)
-        results[xvar] = r2s
-    return results
-
 
 def crf(region, trX, typeDefs, thresholds=None, errorAdjust=0):
     region = np.array(region)
@@ -585,13 +470,42 @@ class analysis:
 
 
 
+def featureImportances(var, trX, data, n_components=85):
+    t1 = time.time()
+    features = list(data.keys())
+    ind = var2ind(var, data)
+    
+    pipe = Pipeline([('scaler', StandardScaler()), ('pca', PCA())]).fit(trX[:, :, 1].T)
+    # strat = [RandomForestRegressor(n_estimators=30).fit(self.X, y) for y in self.Y.T]
+    pca = pipe[1]
+    vrs = pca.explained_variance_ratio_[:n_components] #85 most important principle components such that sum(vrs) > 0.95
+    pcs = np.abs(pca.components_)[:n_components] #principle components
+    
+    res = []
+    
+    for pc in pcs:
+        fis = list(zip(features, pc/sum(pc)))
+        # print(fis)
+        fsum = np.cumsum(sorted([fi[1] for fi in fis], reverse=True))
+        print(fsum)
+        feas = list(zip(features, fsum))
+        sfeas = sorted(feas, key=lambda x: x[1], reverse=True)[:6]
+        
+        res.append(sfeas) 
+    
+    print('fi time', time.time()-t1)
+    return res
+
+
+
+
 
 
 if __name__ == '__main__':
-    # plt.style.use('dark_background')
-
     plt.style.use('dark_background')
     data = readJsonData(path / 'JunoProject' / '示例项目' / 'value.json')
+    
+    features = list(data.keys())
     
     inputVars = ['二沉池混合后-TP (mg/L)', '二沉池混合后-SS (mg/L)']
     controlVars = ['高效澄清池-PAC(投加量) (mg/L)', '高效澄清池-PAM(投加量) (mg/L)']
@@ -615,6 +529,17 @@ if __name__ == '__main__':
     ##########################
     
     trX = knnR(data)
-    plt.hist(A.trX[2, :,1])
-    plt.show()
-    plt.hist(trX[171,:, 1])
+    # plt.hist(A.trX[2, :,1])
+    # plt.show()
+    # plt.hist(trX[171,:, 1])
+    
+    res = featureImportances('缺氧池B（D-N）-NO3-N (mg/L)', trX, data)
+    
+    
+    
+    
+    
+    
+    
+    
+    
