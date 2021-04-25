@@ -18,7 +18,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import Pipeline
 # from sklearn.svm import SVR
 # import time
-from sklearn.decomposition import PCA
+from sklearn.decomposition import PCA, KernelPCA, SparsePCA
 import warnings
 from numba import jit
 # from multiprocessing import Pool
@@ -470,31 +470,44 @@ class analysis:
 
 
 
-def featureImportances(var, trX, data, n_components=85):
+def featureImportances(trX, data, var=None, n_components=None):
     t1 = time.time()
     features = list(data.keys())
-    ind = var2ind(var, data)
+    # ind = var2ind(var, data)
     
     pipe = Pipeline([('scaler', StandardScaler()), ('pca', PCA())]).fit(trX[:, :, 1].T)
     # strat = [RandomForestRegressor(n_estimators=30).fit(self.X, y) for y in self.Y.T]
     pca = pipe[1]
-    vrs = pca.explained_variance_ratio_[:n_components] #85 most important principle components such that sum(vrs) > 0.95
-    pcs = np.abs(pca.components_)[:n_components] #principle components
+    vrs = pca.explained_variance_ratio_ #85 most important principle components such that sum(vrs) > 0.95
     
+    thr = np.percentile(vrs, 90)
+    c = len(vrs[vrs>=thr])
+    pcs = np.abs(pca.components_)[:c] #principle components
+    thresh = np.percentile(pcs, 95)
     res = []
     
     for pc in pcs:
-        fis = list(zip(features, pc/sum(pc)))
-        # print(fis)
-        fsum = np.cumsum(sorted([fi[1] for fi in fis], reverse=True))
-        print(fsum)
-        feas = list(zip(features, fsum))
-        sfeas = sorted(feas, key=lambda x: x[1], reverse=True)[:6]
         
-        res.append(sfeas) 
+        fis = list(zip(features, pc))
+        
+        feas = list(sorted(filter(lambda x: x[1] > thresh, fis), key=lambda x: x[1], reverse=True))
+        
+        res.append(feas) 
+    
+    res = list(filter(lambda x: len(x)>=3, res))
+    
+    result = []
+    if var:
+        for r in res:
+            vs = [vr in [v[0] for v in r] for vr in var]
+            if np.array(vs).all() > 0:
+                result.append(r)
+    else:
+        result = res
     
     print('fi time', time.time()-t1)
-    return res
+    print('命题数量', len(result))
+    return result
 
 
 
@@ -533,7 +546,7 @@ if __name__ == '__main__':
     # plt.show()
     # plt.hist(trX[171,:, 1])
     
-    res = featureImportances('缺氧池B（D-N）-NO3-N (mg/L)', trX, data)
+    res = featureImportances(trX, data, var= ['排放池-TP (mg/L)'])
     
     
     
