@@ -1945,7 +1945,7 @@ if __name__ == '__main__':
     
     MainWindow = QMainWindow()
     window = JunoUI(MainWindow)
-    # MainWindow.setWindowFlags(QtCore.Qt.FramelessWindowHint)
+    
     MainWindow.show()
     app.exec_()
     app.quit()

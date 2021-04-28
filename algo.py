@@ -8,13 +8,14 @@ import sklearn
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.multioutput import MultiOutputRegressor
-# from sklearn.linear_model import BayesianRidge
+from sklearn.linear_model import BayesianRidge, Ridge
 import sklearn.utils._cython_blas
 import sklearn.neighbors._typedefs
 import sklearn.tree
 import sklearn.tree._utils
 import platform
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler, PolynomialFeatures
+
 from sklearn.pipeline import Pipeline
 # from sklearn.svm import SVR
 # import time
@@ -247,8 +248,9 @@ def strategy(trX, thresholds=None, typeDefs=None, safety=1):
     def L(X, Y, safety):
         return (1 - safety) * J(Y) + safety * R(T([[*(X[i][xinds]), *y] for i, y in enumerate(Y)])) + 0.0001
     
+    # pipe1 = Pipeline([('scaler', StandardScaler()), ('poly', PolynomialFeatures(degree=2)), ('linear', BayesianRidge())])
     pipe1 = Pipeline([('scaler', StandardScaler()), ('knn', KNeighborsRegressor())])
-    # pipe = Pipeline([('scaler', StandardScaler()),('pca', PCA()),  ('knn', KNeighborsRegressor())])
+    # pipe1 = Pipeline([('scaler', StandardScaler()),('pca', PCA()),  ('knn', KNeighborsRegressor())])
     lossModel = pipe1.fit([[*(X[i][xinds]), *y] for i, y in enumerate(Y)], L(X, Y, safety=safety))
 
     def localLoss(x):
@@ -507,7 +509,7 @@ def featureImportances(trX, data, var=None, n_components=None):
     
     print('fi time', time.time()-t1)
     print('命题数量', len(result))
-    return result
+    return result, pcs
 
 
 
@@ -538,15 +540,17 @@ if __name__ == '__main__':
     print(A.risks)
     print(A.consumptions)
     print('time taken', time.time()-t1)
-
+    
     ##########################
     
-    trX = knnR(data)
-    # plt.hist(A.trX[2, :,1])
-    # plt.show()
-    # plt.hist(trX[171,:, 1])
+    # trX = knnR(data)
+    # # plt.hist(A.trX[2, :,1])
+    # # plt.show()
+    # # plt.hist(trX[171,:, 1])
+    # # plt.show()
+    # res, pcs = featureImportances(trX, data, var=[''])
     
-    res = featureImportances(trX, data, var= ['排放池-TP (mg/L)'])
+    
     
     
     
