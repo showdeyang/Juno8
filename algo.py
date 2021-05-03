@@ -318,8 +318,8 @@ def strategy(trX, thresholds=None, typeDefs=None, safety=1):
     t3 = time.time()
     
     def localLoss(x):
-
-        xin = np.c_[np.repeat([x], Y.shape[0], axis=0),Y]
+        # xin = [[*x, *y] for i, y in enumerate(Y)]
+        xin = np.c_[np.repeat([x], Y.shape[0], axis=0),Y] #biggest improvement here
         ll = lossModel.predict(xin) + 1*np.sum(np.abs(x-X)/np.mean(X, axis=0), axis=1)
         ll = np.power(ll,10)
         p = (1/ll)/np.sum(1/ll)
