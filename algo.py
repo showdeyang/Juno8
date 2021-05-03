@@ -29,6 +29,11 @@ import json
 import functools
 from matplotlib import pyplot as plt
 
+
+
+# import algoC
+
+
 if not sys.warnoptions:
     warnings.simplefilter("ignore")
 
@@ -48,7 +53,7 @@ def readJsonData(dataPath):
     with open(dataPath, 'r') as f:
         d = json.loads(f.read())
         
-    dt = {key: [(i, float(value)) for i, value in enumerate(d[key]) if value] for key in d}
+    dt = {key: [[i, float(value)] for i, value in enumerate(d[key]) if value] for key in d}
     return dt
 
 def var2ind(var, data):
@@ -60,8 +65,31 @@ def ind2var(ind, data):
     return features[ind]
 
 
-def knnRegress(X, n_points=2000):
+def g(v):
+    return v[0]
+
+
+def syncX(X, Ts):
+    Ts = np.array(Ts)
+    trX = []
+    for x in X:
+        if x:
+            rx = x
+            x = np.array(x)
+            mt = np.setdiff1d(Ts,x[:,0]).reshape(-1,1)
+            rx += np.c_[mt, np.ones(len(mt))*np.nan ].tolist()
+                
+        else:
+            # print('empty x detected')
+            rx = [[t, -1] for t in Ts]
+        rx = sorted(rx, key=g)   
+        # print('new rx', rx)
+        trX.append(rx)
+    return trX
+
+def knnRegress(X, n_points=2000, verbose=False):
     # print(len(X))
+    t1 = time.time()
     T = []
     # print(X[2][:20])
     for x in X:
@@ -75,33 +103,51 @@ def knnRegress(X, n_points=2000):
     n_points = min(maxT-minT, n_points)    
     
     Ts = [int(v) for v in np.linspace(minT, maxT, n_points+1)]
+    
+    t2 = time.time()
     # print(Ts)
-    trX = []
-    for x in X:
-        if x:
-            rx = x
-            # print('rx', rx)
-            for t in Ts:
-                # print([x[0] for x in x])
-                if t not in [r[0] for r in x]:
-                    rx.append((t, np.nan))
+    # trX = []
+    # for x in X:
+    #     if x:
+    #         rx = x
+    #         # print('rx', rx)
+    #         for t in Ts:
+    #             # print([x[0] for x in x])
+    #             if t not in [r[0] for r in x]:
+    #                 rx.append((t, np.nan))
                 
-        else:
-            # print('empty x detected')
-            rx = [(t, -1) for t in Ts]
-        rx = sorted(rx, key=lambda v: v[0])   
-        # print('new rx', rx)
-        trX.append(rx)
+    #     else:
+    #         # print('empty x detected')
+    #         rx = [(t, -1) for t in Ts]
+    #     rx = sorted(rx, key=lambda v: v[0])   
+    #     # print('new rx', rx)
+    #     trX.append(rx)
+    
+    trX = syncX(X, Ts)
+    # trX = algoC.syncX(X,Ts)
+    
+    t3 = time.time()
     
     trX = np.array(trX)
     
     inX = trX[:, :, 1].T
     # print(inX)
-    imputer = KNNImputer(n_neighbors=n_points, weights='distance')
+    imputer = KNNImputer( weights='distance' ) #,n_neighbors=n_points
     xnew = imputer.fit_transform(inX)
     xnew = xnew.T
+    
+    t4 = time.time()
+    
     xnew = [[[Ts[i], x] for i,x in enumerate(xcol)] for xcol in xnew]
     xnew = np.array(xnew)
+    
+    t5 = time.time()
+    if verbose:
+        print('time taken in KNNRegress')
+        print('finding common time', t2-t1)
+        print('synchronizing time',t3-t2)
+        print('knn imputing',t4-t3)
+        print('reformat result', t5-t4)
     
     return xnew
     
@@ -231,6 +277,9 @@ def strategy(trX, thresholds=None, typeDefs=None, safety=1):
     pipe0 = Pipeline([('scaler', StandardScaler()), ('knn', KNeighborsRegressor())])
     
     # model = [RandomForestRegressor(n_estimators=30).fit(XY, z) for z in Z.T]
+    
+
+    
     pipe0.fit(XY, Z)
     T = lambda xy: pipe0.predict(xy)
     
@@ -247,9 +296,9 @@ def strategy(trX, thresholds=None, typeDefs=None, safety=1):
     
     def L(X, Y, safety):
         return (1 - safety) * J(Y) + safety * R(T([[*(X[i][xinds]), *y] for i, y in enumerate(Y)])) + 0.0001
-    
-    # pipe1 = Pipeline([('scaler', StandardScaler()), ('poly', PolynomialFeatures(degree=2)), ('linear', BayesianRidge())])
-    pipe1 = Pipeline([('scaler', StandardScaler()), ('knn', KNeighborsRegressor())])
+   
+    pipe1 = Pipeline([('scaler', StandardScaler()), ('poly', PolynomialFeatures(degree=2)), ('linear', BayesianRidge())])
+    # pipe1 = Pipeline([('scaler', StandardScaler()), ('knn', KNeighborsRegressor())])
     # pipe1 = Pipeline([('scaler', StandardScaler()),('pca', PCA()),  ('knn', KNeighborsRegressor())])
     lossModel = pipe1.fit([[*(X[i][xinds]), *y] for i, y in enumerate(Y)], L(X, Y, safety=safety))
 
@@ -378,10 +427,10 @@ def efficacy(trX, strat, T, thresholds, typeDefs=None, startIndex=0, endIndex=No
     
     return decisions, predZ, consumptions, risks
 
-def knnR(data, time_dimension=True):
+def knnR(data, time_dimension=True, verbose=False):
     t1 = time.time()
     print('Regressing data... This may take a while...')
-    trX = knnRegress([data[feature] for feature in  data])
+    trX = knnRegress([data[feature] for feature in  data], verbose=verbose)
     
     if not time_dimension:
         trX = trX[:,:, 1]
@@ -527,7 +576,7 @@ if __name__ == '__main__':
     outputVars = ['排放池-TP在线 (mg/L)', '高效澄清池-SS (mg/L)']
     
     # inputVars = ['二沉池混合后-TOC (mg/L)', '缺氧池B（D-N）-NO3-N (mg/L)']
-    # controlVars = ['高效澄清池-粉炭(投加量) (mg/L)']
+    # controlVars = ['高效澄清池-粉炭4(投加量) (mg/L)']
     # outputVars = ['高效澄清池-TOC (mg/L)']
     
     typeDefs = [-1]*len(inputVars) + [1/len(controlVars)]*len(controlVars) + [2]*len(outputVars)
@@ -543,12 +592,12 @@ if __name__ == '__main__':
     
     ##########################
     
-    # trX = knnR(data)
-    # # plt.hist(A.trX[2, :,1])
-    # # plt.show()
-    # # plt.hist(trX[171,:, 1])
-    # # plt.show()
-    # res, pcs = featureImportances(trX, data, var=[''])
+    trX = knnR(data, verbose=True)
+    # plt.hist(A.trX[2, :,1])
+    # plt.show()
+    # plt.hist(trX[171,:, 1])
+    # plt.show()
+    res, pcs = featureImportances(trX, data, var=[])
     
     
     
