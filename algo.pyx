@@ -1,25 +1,23 @@
 # -*- coding: utf-8 -*-
 import numpy as np
-cimport numpy as np
 import sys
 import math
 import random
 from pathlib import Path
 import sklearn
+from sklearn import preprocessing, linear_model
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.multioutput import MultiOutputRegressor
-from sklearn.linear_model import BayesianRidge, Ridge
+from sklearn.linear_model import BayesianRidge, Ridge, LinearRegression
 import sklearn.utils._cython_blas
 import sklearn.neighbors._typedefs
 import sklearn.tree
 import sklearn.tree._utils
 import platform
 from sklearn.preprocessing import StandardScaler, PolynomialFeatures
-
 from sklearn.pipeline import Pipeline
-# from sklearn.svm import SVR
-# import time
+from sklearn.svm import SVR
 from sklearn.decomposition import PCA, KernelPCA, SparsePCA
 import warnings
 from numba import jit
@@ -29,7 +27,6 @@ import time
 import json
 import functools
 from matplotlib import pyplot as plt
-import cython
 
 if not sys.warnoptions:
     warnings.simplefilter("ignore")
@@ -62,42 +59,28 @@ def ind2var(ind, data):
     return features[ind]
 
 
-cpdef int g(list v):
+def g(v):
     return v[0]
 
-@cython.wraparound(False)
-@cython.cdivision(True)
-@cython.nonecheck(False)
-cpdef syncX(list X, list Ts):
-    cdef list trX = []
-    cdef list rx
-    cdef int t
-    cdef list r
 
+def syncX(X, Ts):
+    Ts = np.array(Ts)
+    trX = []
     for x in X:
-        
         if x:
-            
             rx = x
             x = np.array(x)
-            mt = np.setdiff1d(Ts,x[:,0])
-            # ax = [[t, np.nan] for t in mt]      
-            # ax = np.c_[mt, np.nan]
-            mt.reshape(-1,1)
-            ax = np.c_[mt, np.ones(len(mt))*np.nan ].tolist()
-            rx += ax
+            mt = np.setdiff1d(Ts,x[:,0]).reshape(-1,1)
+            rx += np.c_[mt, np.ones(len(mt))*np.nan ].tolist()
                 
         else:
             # print('empty x detected')
-            
             rx = [[t, -1] for t in Ts]
-        rx = sorted(rx, key=g)   
+        rx = sorted(rx, key=lambda v: v[0]) 
         trX.append(rx)
-
     return trX
 
-cpdef knnRegress(list X, n_points=2000, verbose=False):
-    # cdef np.ndarray xnew
+def knnRegress(X, n_points=2000, verbose=False):
     # print(len(X))
     t1 = time.time()
     T = []
@@ -112,7 +95,7 @@ cpdef knnRegress(list X, n_points=2000, verbose=False):
     
     n_points = min(maxT-minT, n_points)    
     
-    cdef list Ts = [int(v) for v in np.linspace(minT, maxT, n_points+1)]
+    Ts = [int(v) for v in np.linspace(minT, maxT, n_points+1)]
     
     t2 = time.time()
     # print(Ts)
@@ -133,38 +116,23 @@ cpdef knnRegress(list X, n_points=2000, verbose=False):
     #     # print('new rx', rx)
     #     trX.append(rx)
     
-    cdef list trX1 = syncX(X, Ts)
+    trX = syncX(X, Ts)
     # trX = algoC.syncX(X,Ts)
     
     t3 = time.time()
     
-    cdef np.ndarray trX
-    trX = np.array(trX1)
-    
-    cdef np.ndarray inX
+    trX = np.array(trX)
     
     inX = trX[:, :, 1].T
     # print(inX)
-    
-    cdef object imputer
-    cdef str weights
-    cdef np.ndarray xnew
-    
     imputer = KNNImputer( weights='distance' ) #,n_neighbors=n_points
     xnew = imputer.fit_transform(inX)
     xnew = xnew.T
     
     t4 = time.time()
     
-    cdef list xnew1
-    cdef np.ndarray xcol
-    cdef int i
-    
-    
-    xnew1 = [[[Ts[i], x] for i,x in enumerate(xcol)] for xcol in xnew]
-    
-    
-    xnew = np.array(xnew1)
+    xnew = [[[Ts[i], x] for i,x in enumerate(xcol)] for xcol in xnew]
+    xnew = np.array(xnew)
     
     t5 = time.time()
     if verbose:
@@ -281,6 +249,13 @@ def is_number(n):
         return False
     return True
 
+class BarebonesStandardScaler(preprocessing.StandardScaler):
+    def transform(self, x):
+        return (x - self.mean_) / self.var_ ** .5
+
+class BarebonesLinearRegression(linear_model.LinearRegression):
+    def predict(self, x):
+        return np.matmul(x, self.coef_) + self.intercept_
 
 def strategy(trX, thresholds=None, typeDefs=None, safety=1):
     # if not typeDefs:
@@ -288,6 +263,9 @@ def strategy(trX, thresholds=None, typeDefs=None, safety=1):
     if not typeDefs:
         print('ERROR: typeDefs is None')
         return
+    
+    t0 = time.time()
+    
     typeDefs = np.array(typeDefs)
     xinds = [i for i, td in enumerate(typeDefs) if td < 0]
     yinds = [i for i, td in enumerate(typeDefs) if 0 <= td <= 1]
@@ -299,7 +277,9 @@ def strategy(trX, thresholds=None, typeDefs=None, safety=1):
     XY = trX[xyinds, :, 1].T
     Z = trX[zinds, :, 1].T
     
-    pipe0 = Pipeline([('scaler', StandardScaler()), ('knn', KNeighborsRegressor())])
+    t1 = time.time()
+    
+    pipe0 = Pipeline([('scaler', BarebonesStandardScaler()), ('knn', KNeighborsRegressor())])
     
     # model = [RandomForestRegressor(n_estimators=30).fit(XY, z) for z in Z.T]
     
@@ -307,6 +287,8 @@ def strategy(trX, thresholds=None, typeDefs=None, safety=1):
     
     pipe0.fit(XY, Z)
     T = lambda xy: pipe0.predict(xy)
+    
+    t2 = time.time()
     
     THR = np.array([[[float(thresh.replace('q', '').replace("%", ''))/100, threshold[thresh]] for thresh in threshold] for threshold in thresholds], dtype=object)
 
@@ -319,35 +301,53 @@ def strategy(trX, thresholds=None, typeDefs=None, safety=1):
     def R(Z_var):
         return np.matmul(np.array([[np.max([THR[j][i][0]*np.clip(z[j] - THR[j][i][1], 0, np.inf) for i, thresh in enumerate(threshold)]) for j, threshold in enumerate(thresholds)] for z in Z_var]) / np.mean(Z, axis=0), typeDefs[zinds])
     
+    # xys = [[*(X[i]), *y] for i, y in enumerate(Y)]
+    xys = np.c_[X,Y]
+    
     def L(X, Y, safety):
-        return (1 - safety) * J(Y) + safety * R(T([[*(X[i][xinds]), *y] for i, y in enumerate(Y)])) + 0.0001
+        return (1 - safety) * J(Y) + safety * R(T(xys)) + 0.0001
    
-    pipe1 = Pipeline([('scaler', StandardScaler()), ('poly', PolynomialFeatures(degree=2)), ('linear', BayesianRidge())])
+    # pipe1 = Pipeline([('scaler', StandardScaler()), ('poly', PolynomialFeatures(degree=3)), ('linear', BayesianRidge())])
+    # pipe1 = Pipeline([('poly', PolynomialFeatures(degree=3)), ('linear', LinearRegression(normalize=True))])
+    pipe1 = Pipeline([('scaler', BarebonesStandardScaler()), ('poly', PolynomialFeatures(degree=3)), ('linear', BarebonesLinearRegression())])
     # pipe1 = Pipeline([('scaler', StandardScaler()), ('knn', KNeighborsRegressor())])
+    # pipe1 = Pipeline([('scaler', StandardScaler()), ('svr', SVR(kernel='poly', degree=2))])
     # pipe1 = Pipeline([('scaler', StandardScaler()),('pca', PCA()),  ('knn', KNeighborsRegressor())])
-    lossModel = pipe1.fit([[*(X[i][xinds]), *y] for i, y in enumerate(Y)], L(X, Y, safety=safety))
-
+    lossModel = pipe1.fit(xys, L(X, Y, safety=safety))
+    
+    t3 = time.time()
+    
     def localLoss(x):
-        # xin = [[*(np.multiply(x, np.ones(Y.shape))[i][xinds]), *y] for i, y in enumerate(Y)]
-        xin = [[*x, *y] for i, y in enumerate(Y)]
+
+        xin = np.c_[np.repeat([x], Y.shape[0], axis=0),Y]
         ll = lossModel.predict(xin) + 1*np.sum(np.abs(x-X)/np.mean(X, axis=0), axis=1)
-        ll = ll**10
+        ll = np.power(ll,10)
         p = (1/ll)/np.sum(1/ll)
         policy = np.matmul(p, Y)
         return policy
     
     rinds = random.sample(range(len(X)), k=int(len(X)/10))
     
-    Y1 = [localLoss(x) for x in X[rinds]]
+    Y1 = list(map(localLoss, X[rinds]))
+
+    t4 = time.time()
     
     X1,Y1 = np.array(X[rinds]), np.array(Y1)
     # print(Y1[:20])
-    pipe2 = Pipeline([('scaler', StandardScaler()), ('knn', KNeighborsRegressor())])
+    pipe2 = Pipeline([('scaler', BarebonesStandardScaler()), ('knn', KNeighborsRegressor())])
     
     # strat = [RandomForestRegressor(n_estimators=30).fit(X1, y) for y in Y1.T]
     pipe2.fit(X1, Y1)
     S = lambda x: pipe2.predict(x)
     
+    t5 = time.time()
+    
+    
+    print('preparing inputs', t1-t0)
+    print('T-model', t2-t1)
+    print('L-model', t3-t2)
+    print('L2-model', t4-t3)
+    print('S-model', t5-t4)
     return S, T
     
 
@@ -370,8 +370,8 @@ def efficacy(trX, strat, T, thresholds, typeDefs=None, startIndex=0, endIndex=No
     Z = trX[zinds, :, 1]
     
     decisions = strat(trX[xinds, :, 1].T)
-    xin = [[*(X.T[i][xinds]), *decision] for i, decision in enumerate(decisions)]
-    
+    # xin = [[*(X.T[i][xinds]), *decision] for i, decision in enumerate(decisions)]
+    xin = np.c_[X.T, decisions]
     predZ = T(xin)
     
     THR = np.array([[[float(thresh.replace('q', '').replace("%", ''))/100, threshold[thresh]] for thresh in threshold] for threshold in thresholds], dtype=object)
@@ -470,6 +470,7 @@ def knnR(data, time_dimension=True, verbose=False):
 class analysis:
     def __init__(self, data, inputVars, controlVars, outputVars, thresholds, typeDefs=None, safety=0.7, startIndex=None, endIndex=None, verbose=True):
         # startIndex 和 endIndex 必须都要为负数
+        print('ELAPSE TIME BREAKDOWN')
         t1 = time.time()
         xinds = [i for i, td in enumerate(typeDefs) if td < 0]
         yinds = [i for i, td in enumerate(typeDefs) if 0 <= td <= 1]
@@ -479,7 +480,7 @@ class analysis:
         txs = [data[feature] for feature in inputVars + controlVars + outputVars]
         #maxT = np.max(np.array([data[feature] for feature in data][0])[:, 0])
         self.trX = knnRegress(txs)
-        
+        t2 = time.time()
         X = self.trX[xinds, :, 1].T
         Y = self.trX[yinds, :, 1].T
         Z = self.trX[zinds, :, 1].T
@@ -506,23 +507,33 @@ class analysis:
         self.Yhm = self.Y[startIndex:endIndex] 
         self.Zhm = self.Z[startIndex:endIndex] 
         self.Xopt = self.Xhm
-
+        t3 = time.time()
         self.train()
-        t2 = time.time()
-        print('time taken', t2-t1)
+        t4 = time.time()
+        print('knn regress time', t2-t1)
+        print('variables declaration time', t3-t2)
+        print('_'*50)
+        print('TOTAL TIME TAKEN', t4-t1,)
+        print('_'*50)
         
     def train(self):  # opt 机器
-        pipe3 = Pipeline([('scaler', StandardScaler()), ('knn', KNeighborsRegressor())])
+        t5 = time.time()
+        pipe3 = Pipeline([('scaler', BarebonesStandardScaler()), ('knn', KNeighborsRegressor())])
         # strat = [RandomForestRegressor(n_estimators=30).fit(self.X, y) for y in self.Y.T]
         strat = pipe3.fit(self.X, self.Y)
+        
         self.S_hm = lambda x: strat.predict(x)
-
+        t6 = time.time()
         self.S, self.T = strategy(self.trX, thresholds=self.thresholds, typeDefs=self.typeDefs, safety=self.safety)
+        t7 = time.time()
         self.Yopt, self.Zopt, consumptions, risks = efficacy(self.trX, strat=self.S, T=self.T, typeDefs=self.typeDefs, thresholds=self.thresholds, startIndex=self.startIndex, endIndex=self.endIndex, verbose=self.verbose)
         
         self.consumptions = dict(zip(self.controlVars, consumptions))
         self.risks = dict(zip(self.outputVars, risks))
-        
+        t8 = time.time()
+        print('Shm-Model', t6-t5)
+        # print('strategy time', t7-t6)
+        print('efficacy time', t8-t7)
     def crf(self, rx=None, ry=None, rz=None):
         if not rx:
             rx = [[0, np.inf]]*len(self.xinds)
@@ -601,7 +612,7 @@ if __name__ == '__main__':
     outputVars = ['排放池-TP在线 (mg/L)', '高效澄清池-SS (mg/L)']
     
     # inputVars = ['二沉池混合后-TOC (mg/L)', '缺氧池B（D-N）-NO3-N (mg/L)']
-    # controlVars = ['高效澄清池-粉炭(投加量) (mg/L)']
+    # controlVars = ['高效澄清池-粉炭4(投加量) (mg/L)']
     # outputVars = ['高效澄清池-TOC (mg/L)']
     
     typeDefs = [-1]*len(inputVars) + [1/len(controlVars)]*len(controlVars) + [2]*len(outputVars)
