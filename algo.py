@@ -121,9 +121,14 @@ def knnRegress(X, n_points=2000, verbose=False):
     
     t3 = time.time()
     
-    trX = np.array(trX)
-    
-    inX = trX[:, :, 1].T
+    trX = np.asarray(trX)
+    # print(trX.shape)
+    # print(trX)
+    try:
+        inX = trX[:, :, 1].T
+    except IndexError:
+        #containing list of list that can't be converted to np.array
+        inX = [[trX[j][i][1] for j, col in enumerate(trX)] for i,row in enumerate(trX[0])]
     # print(inX)
     imputer = KNNImputer( weights='distance' ) #,n_neighbors=n_points
     xnew = imputer.fit_transform(inX)
