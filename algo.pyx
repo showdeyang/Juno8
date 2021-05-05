@@ -121,9 +121,14 @@ def knnRegress(X, n_points=2000, verbose=False):
     
     t3 = time.time()
     
-    trX = np.array(trX)
-    
-    inX = trX[:, :, 1].T
+    trX = np.asarray(trX)
+    # print(trX.shape)
+    # print(trX)
+    try:
+        inX = trX[:, :, 1].T
+    except IndexError:
+        #containing list of list that can't be converted to np.array
+        inX = [[trX[j][i][1] for j, col in enumerate(trX)] for i,row in enumerate(trX[0])]
     # print(inX)
     imputer = KNNImputer( weights='distance' ) #,n_neighbors=n_points
     xnew = imputer.fit_transform(inX)
@@ -318,8 +323,8 @@ def strategy(trX, thresholds=None, typeDefs=None, safety=1):
     t3 = time.time()
     
     def localLoss(x):
-
-        xin = np.c_[np.repeat([x], Y.shape[0], axis=0),Y]
+        # xin = [[*x, *y] for i, y in enumerate(Y)]
+        xin = np.c_[np.repeat([x], Y.shape[0], axis=0),Y] #biggest improvement here
         ll = lossModel.predict(xin) + 1*np.sum(np.abs(x-X)/np.mean(X, axis=0), axis=1)
         ll = np.power(ll,10)
         p = (1/ll)/np.sum(1/ll)

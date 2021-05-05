@@ -123,7 +123,7 @@ def knnRegress(X, n_points=2000, verbose=False):
     
     trX = np.asarray(trX)
     # print(trX.shape)
-    # print(trX)
+    print(trX)
     try:
         inX = trX[:, :, 1].T
     except IndexError:
@@ -517,9 +517,9 @@ class analysis:
         t4 = time.time()
         print('knn regress time', t2-t1)
         print('variables declaration time', t3-t2)
-        print('_'*50)
+        print('——'*40)
         print('TOTAL TIME TAKEN', t4-t1,)
-        print('_'*50)
+        print('——'*40)
         
     def train(self):  # opt 机器
         t5 = time.time()
