@@ -27,6 +27,8 @@ import time
 import json
 import functools
 from matplotlib import pyplot as plt
+import statistics
+import pprint
 
 if not sys.warnoptions:
     warnings.simplefilter("ignore")
@@ -41,7 +43,24 @@ else:
     font = 'Lucida Grande'
     newline = '\n'
     encoding = 'gbk'
+-
+def about(verbose=True):
+    d = {'version': '2.1.1',
+         'name': 'algo',
+         'for': 'juno',
+         'author': 'Show De Yang',
+         'company': 'DataHans, Juneng',
+         'python': 'cp37',
+         'changelog': [('2.0', 'Cython-precompiled algo, to improve performance.'),
+                       ('2.1.0', 'Added algo.about() function to display metadata about algo.pyd.'),
+             ('2.1.1', 'knnRegress: n_points change from 2000 to 6000 to allow for 15 years of data. Bug will occur when n_points < n(days in data).')]
+         }
+    # print(d)
+    print('ABOUT ALGO')
+    pprint.pprint(d)
+    return d
 
+about()
 
 def readJsonData(dataPath):
     with open(dataPath, 'r') as f:
@@ -65,22 +84,31 @@ def g(v):
 
 def syncX(X, Ts):
     Ts = np.array(Ts)
+    # print('Ts', len(Ts))
     trX = []
-    for x in X:
+    for i, x in enumerate(X):
         if x:
             rx = x
             x = np.array(x)
             mt = np.setdiff1d(Ts,x[:,0]).reshape(-1,1)
             rx += np.c_[mt, np.ones(len(mt))*np.nan ].tolist()
-                
+            
         else:
             # print('empty x detected')
             rx = [[t, -1] for t in Ts]
         rx = sorted(rx, key=lambda v: v[0]) 
+        
         trX.append(rx)
+    
+    # #length checking
+    # print('length', max([len(rx) for rx in trX]))
+    # errs = [(i, len(rx)) for i, rx in enumerate(trX) if len(rx) < max([len(rx) for rx in trX])]
+    # print(len(errs), 'out of', len(trX))
+    # print(errs)
+    
     return trX
 
-def knnRegress(X, n_points=2000, verbose=False):
+def knnRegress(X, n_points=6000, verbose=False):
     # print(len(X))
     t1 = time.time()
     T = []
@@ -89,47 +117,24 @@ def knnRegress(X, n_points=2000, verbose=False):
         T += [r[0] for r in x]
     # print(T)
     # T = list(set(T))
-    minT = 0
+    minT = math.floor(min(T))
     maxT = math.ceil(max(T))
     # print('maxT', maxT)
     
     n_points = min(maxT-minT, n_points)    
     
-    Ts = [int(v) for v in np.linspace(minT, maxT, n_points+1)]
+    Ts = list(set([int(v) for v in np.linspace(minT, maxT, n_points+1)]))
     
     t2 = time.time()
-    # print(Ts)
-    # trX = []
-    # for x in X:
-    #     if x:
-    #         rx = x
-    #         # print('rx', rx)
-    #         for t in Ts:
-    #             # print([x[0] for x in x])
-    #             if t not in [r[0] for r in x]:
-    #                 rx.append((t, np.nan))
-                
-    #     else:
-    #         # print('empty x detected')
-    #         rx = [(t, -1) for t in Ts]
-    #     rx = sorted(rx, key=lambda v: v[0])   
-    #     # print('new rx', rx)
-    #     trX.append(rx)
-    
+
     trX = syncX(X, Ts)
-    # trX = algoC.syncX(X,Ts)
     
     t3 = time.time()
     
-    trX = np.asarray(trX)
-    # print(trX.shape)
-    # print(trX)
-    try:
-        inX = trX[:, :, 1].T
-    except IndexError:
-        #containing list of list that can't be converted to np.array
-        inX = [[trX[j][i][1] for j, col in enumerate(trX)] for i,row in enumerate(trX[0])]
-    # print(inX)
+    trX = np.array(trX)
+    
+    inX = trX[:, :, 1].T
+
     imputer = KNNImputer( weights='distance' ) #,n_neighbors=n_points
     xnew = imputer.fit_transform(inX)
     xnew = xnew.T
@@ -517,9 +522,9 @@ class analysis:
         t4 = time.time()
         print('knn regress time', t2-t1)
         print('variables declaration time', t3-t2)
-        print('_'*50)
+        print('——'*40)
         print('TOTAL TIME TAKEN', t4-t1,)
-        print('_'*50)
+        print('——'*40)
         
     def train(self):  # opt 机器
         t5 = time.time()
@@ -610,29 +615,29 @@ if __name__ == '__main__':
     plt.style.use('dark_background')
     data = readJsonData(path / 'JunoProject' / '示例项目' / 'value.json')
     
-    features = list(data.keys())
+    # features = list(data.keys())
     
-    inputVars = ['二沉池混合后-TP (mg/L)', '二沉池混合后-SS (mg/L)']
-    controlVars = ['高效澄清池-PAC(投加量) (mg/L)', '高效澄清池-PAM(投加量) (mg/L)']
-    outputVars = ['排放池-TP在线 (mg/L)', '高效澄清池-SS (mg/L)']
+    # inputVars = ['二沉池混合后-TP (mg/L)', '二沉池混合后-SS (mg/L)']
+    # controlVars = ['高效澄清池-PAC(投加量) (mg/L)', '高效澄清池-PAM(投加量) (mg/L)']
+    # outputVars = ['排放池-TP在线 (mg/L)', '高效澄清池-SS (mg/L)']
     
-    # inputVars = ['二沉池混合后-TOC (mg/L)', '缺氧池B（D-N）-NO3-N (mg/L)']
-    # controlVars = ['高效澄清池-粉炭4(投加量) (mg/L)']
-    # outputVars = ['高效澄清池-TOC (mg/L)']
+    # # inputVars = ['二沉池混合后-TOC (mg/L)', '缺氧池B（D-N）-NO3-N (mg/L)']
+    # # controlVars = ['高效澄清池-粉炭4(投加量) (mg/L)']
+    # # outputVars = ['高效澄清池-TOC (mg/L)']
     
-    typeDefs = [-1]*len(inputVars) + [1/len(controlVars)]*len(controlVars) + [2]*len(outputVars)
+    # typeDefs = [-1]*len(inputVars) + [1/len(controlVars)]*len(controlVars) + [2]*len(outputVars)
     
     
-    t1 = time.time()
+    # t1 = time.time()
     
-    thresholds = [{'q99%': 0.5}, {'q99%': 9, 'q80%': 7}]
-    A = analysis(data, inputVars, controlVars, outputVars, thresholds, typeDefs, safety=0.5, verbose=True)
-    print(A.risks)
-    print(A.consumptions)
-    print('time taken', time.time()-t1)
+    # thresholds = [{'q99%': 0.5}, {'q99%': 9, 'q80%': 7}]
+    # A = analysis(data, inputVars, controlVars, outputVars, thresholds, typeDefs, safety=0.5, verbose=True)
+    # print(A.risks)
+    # print(A.consumptions)
+    # print('time taken', time.time()-t1)
     
     ##########################
-    
+    # data = readJsonData('C:/Users/showd/code/Juno8/JunoProject/江宁化工/value.json')
     trX = knnR(data, verbose=True)
     # plt.hist(A.trX[2, :,1])
     # plt.show()

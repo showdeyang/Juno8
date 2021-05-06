@@ -1,4 +1,4 @@
-
+# -*- coding: utf-8 -*-
 import sys
 import os
 from PyQt5 import QtCore
@@ -1936,10 +1936,10 @@ if __name__ == '__main__':
     
     app = QApplication(sys.argv)
     app.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling)
-    app.setStyle('Fusion')
+    # app.setStyle('Fusion')
     # dark_stylesheet = qdarkstyle.load_stylesheet(qt_api='pyqt5')
     # app.setStyleSheet(dark_stylesheet)
-    app.setStyleSheet(open('QSS\\texstudio.qss', encoding='utf-8').read())
+    # app.setStyleSheet(open('QSS\\texstudio.qss', encoding='utf-8').read())
     
     
     

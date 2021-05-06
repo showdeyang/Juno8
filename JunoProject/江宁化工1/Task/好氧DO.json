@@ -1,1 +1,0 @@
-{"situation": ["\u5747\u8d28\u6c60-TOC (online)"], "action": ["\u603b\u8fdb\u6c34-COD (mg/L)"], "result": ["\u4e8b\u6545\u6c60-COD (mg/L)"], "cost": {"\u603b\u8fdb\u6c34-COD (mg/L)": "100"}, "risk": {"\u4e8b\u6545\u6c60-COD (mg/L)": "100"}, "border": {"\u4e8b\u6545\u6c60-COD (mg/L)": {"99": "100000"}}, "begin": 41422, "end": 44271, "safety": "0.5"}
