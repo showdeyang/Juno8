@@ -29,6 +29,7 @@ import functools
 from matplotlib import pyplot as plt
 import statistics
 import pprint
+import datetime
 
 if not sys.warnoptions:
     warnings.simplefilter("ignore")
@@ -43,21 +44,24 @@ else:
     font = 'Lucida Grande'
     newline = '\n'
     encoding = 'gbk'
--
+
 def about(verbose=True):
-    d = {'version': '2.1.1',
-         'name': 'algo',
-         'for': 'juno',
+    d = {'version': '2.1.2',
+         'name': 'JunoAlgo',
+         'release': str(datetime.datetime.now()),
          'author': 'Show De Yang',
          'company': 'DataHans, Juneng',
          'python': 'cp37',
          'changelog': [('2.0', 'Cython-precompiled algo, to improve performance.'),
                        ('2.1.0', 'Added algo.about() function to display metadata about algo.pyd.'),
-             ('2.1.1', 'knnRegress: n_points change from 2000 to 6000 to allow for 15 years of data. Bug will occur when n_points < n(days in data).')]
+             ('2.1.1', 'knnRegress: n_points change from 2000 to 6000 to allow for 15 years of data. Bug will occur when n_points < n(days in data).'),
+             ('2.1.2', 'pipe1 removed StandardScaler, LinearRegression added normalize=True')]
          }
     # print(d)
-    print('ABOUT ALGO')
-    pprint.pprint(d)
+    if verbose:
+        print('ABOUT ALGO')
+        print('This is the precompiled algo.')
+        pprint.pprint(d)
     return d
 
 about()
@@ -319,7 +323,9 @@ def strategy(trX, thresholds=None, typeDefs=None, safety=1):
    
     # pipe1 = Pipeline([('scaler', StandardScaler()), ('poly', PolynomialFeatures(degree=3)), ('linear', BayesianRidge())])
     # pipe1 = Pipeline([('poly', PolynomialFeatures(degree=3)), ('linear', LinearRegression(normalize=True))])
-    pipe1 = Pipeline([('scaler', BarebonesStandardScaler()), ('poly', PolynomialFeatures(degree=3)), ('linear', BarebonesLinearRegression())])
+    # pipe1 = Pipeline([('scaler', BarebonesStandardScaler()), ('poly', PolynomialFeatures(degree=3)), ('linear', BarebonesLinearRegression())])
+    # pipe1 = Pipeline([('scaler', BarebonesStandardScaler()), ('poly', PolynomialFeatures(degree=3)), ('linear', BarebonesLinearRegression())])
+    pipe1 = Pipeline([('poly', PolynomialFeatures(degree=3)), ('linear', BarebonesLinearRegression(normalize=True))])
     # pipe1 = Pipeline([('scaler', StandardScaler()), ('knn', KNeighborsRegressor())])
     # pipe1 = Pipeline([('scaler', StandardScaler()), ('svr', SVR(kernel='poly', degree=2))])
     # pipe1 = Pipeline([('scaler', StandardScaler()),('pca', PCA()),  ('knn', KNeighborsRegressor())])
@@ -615,26 +621,26 @@ if __name__ == '__main__':
     plt.style.use('dark_background')
     data = readJsonData(path / 'JunoProject' / '示例项目' / 'value.json')
     
-    # features = list(data.keys())
+    features = list(data.keys())
     
-    # inputVars = ['二沉池混合后-TP (mg/L)', '二沉池混合后-SS (mg/L)']
-    # controlVars = ['高效澄清池-PAC(投加量) (mg/L)', '高效澄清池-PAM(投加量) (mg/L)']
-    # outputVars = ['排放池-TP在线 (mg/L)', '高效澄清池-SS (mg/L)']
+    inputVars = ['二沉池混合后-TP (mg/L)', '二沉池混合后-SS (mg/L)']
+    controlVars = ['高效澄清池-PAC(投加量) (mg/L)', '高效澄清池-PAM(投加量) (mg/L)']
+    outputVars = ['排放池-TP在线 (mg/L)', '高效澄清池-SS (mg/L)']
     
-    # # inputVars = ['二沉池混合后-TOC (mg/L)', '缺氧池B（D-N）-NO3-N (mg/L)']
-    # # controlVars = ['高效澄清池-粉炭4(投加量) (mg/L)']
-    # # outputVars = ['高效澄清池-TOC (mg/L)']
+    # inputVars = ['二沉池混合后-TOC (mg/L)', '缺氧池B（D-N）-NO3-N (mg/L)']
+    # controlVars = ['高效澄清池-粉炭4(投加量) (mg/L)']
+    # outputVars = ['高效澄清池-TOC (mg/L)']
     
-    # typeDefs = [-1]*len(inputVars) + [1/len(controlVars)]*len(controlVars) + [2]*len(outputVars)
+    typeDefs = [-1]*len(inputVars) + [1/len(controlVars)]*len(controlVars) + [2]*len(outputVars)
     
     
-    # t1 = time.time()
+    t1 = time.time()
     
-    # thresholds = [{'q99%': 0.5}, {'q99%': 9, 'q80%': 7}]
-    # A = analysis(data, inputVars, controlVars, outputVars, thresholds, typeDefs, safety=0.5, verbose=True)
-    # print(A.risks)
-    # print(A.consumptions)
-    # print('time taken', time.time()-t1)
+    thresholds = [{'q99%': 0.5}, {'q99%': 9, 'q80%': 7}]
+    A = analysis(data, inputVars, controlVars, outputVars, thresholds, typeDefs, safety=0.5, verbose=True)
+    print(A.risks)
+    print(A.consumptions)
+    print('time taken', time.time()-t1)
     
     ##########################
     # data = readJsonData('C:/Users/showd/code/Juno8/JunoProject/江宁化工/value.json')

@@ -29,6 +29,7 @@ import functools
 from matplotlib import pyplot as plt
 import statistics
 import pprint
+import datetime
 
 if not sys.warnoptions:
     warnings.simplefilter("ignore")
@@ -45,15 +46,16 @@ else:
     encoding = 'gbk'
 
 def about(verbose=True):
-    d = {'version': '2.1.1',
-         'name': 'algo',
-         'for': 'juno',
+    d = {'version': '2.1.2',
+         'name': 'JunoAlgo',
+         'release': str(datetime.datetime.now()),
          'author': 'Show De Yang',
          'company': 'DataHans, Juneng',
          'python': 'cp37',
          'changelog': [('2.0', 'Cython-precompiled algo, to improve performance.'),
                        ('2.1.0', 'Added algo.about() function to display metadata about algo.pyd.'),
-             ('2.1.1', 'knnRegress: n_points change from 2000 to 6000 to allow for 15 years of data. Bug will occur when n_points < n(days in data).')]
+             ('2.1.1', 'knnRegress: n_points change from 2000 to 6000 to allow for 15 years of data. Bug will occur when n_points < n(days in data).'),
+             ('2.1.2', 'pipe1 removed StandardScaler, LinearRegression added normalize=True')]
          }
     # print(d)
     if verbose:
@@ -320,7 +322,9 @@ def strategy(trX, thresholds=None, typeDefs=None, safety=1):
    
     # pipe1 = Pipeline([('scaler', StandardScaler()), ('poly', PolynomialFeatures(degree=3)), ('linear', BayesianRidge())])
     # pipe1 = Pipeline([('poly', PolynomialFeatures(degree=3)), ('linear', LinearRegression(normalize=True))])
-    pipe1 = Pipeline([('scaler', BarebonesStandardScaler()), ('poly', PolynomialFeatures(degree=3)), ('linear', BarebonesLinearRegression())])
+    # pipe1 = Pipeline([('scaler', BarebonesStandardScaler()), ('poly', PolynomialFeatures(degree=3)), ('linear', BarebonesLinearRegression())])
+    # pipe1 = Pipeline([('scaler', BarebonesStandardScaler()), ('poly', PolynomialFeatures(degree=3)), ('linear', BarebonesLinearRegression())])
+    pipe1 = Pipeline([('poly', PolynomialFeatures(degree=3)), ('linear', BarebonesLinearRegression(normalize=True))])
     # pipe1 = Pipeline([('scaler', StandardScaler()), ('knn', KNeighborsRegressor())])
     # pipe1 = Pipeline([('scaler', StandardScaler()), ('svr', SVR(kernel='poly', degree=2))])
     # pipe1 = Pipeline([('scaler', StandardScaler()),('pca', PCA()),  ('knn', KNeighborsRegressor())])
@@ -578,8 +582,9 @@ def featureImportances(trX, data, var=None, n_components=None):
     pca = pipe[1]
     vrs = pca.explained_variance_ratio_ #85 most important principle components such that sum(vrs) > 0.95
     
-    thr = np.percentile(vrs, 90)
+    thr = np.percentile(vrs, 95)
     c = len(vrs[vrs>=thr])
+    print('components', c)
     pcs = np.abs(pca.components_)[:c] #principle components
     thresh = np.percentile(pcs, 95)
     res = []
