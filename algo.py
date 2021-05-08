@@ -572,7 +572,7 @@ class analysis:
 
 
 
-def featureImportances(trX, data, var=None, n_components=None):
+def propPCA(trX, data, var=None, n_components=None):
     t1 = time.time()
     features = list(data.keys())
     # ind = var2ind(var, data)
@@ -612,7 +612,14 @@ def featureImportances(trX, data, var=None, n_components=None):
     print('命题数量', len(result))
     return result, pcs
 
-
+def FIRF(trX, data):
+    
+    t1 = time.time()
+    features = list(data.keys())
+    
+    
+    
+    ...
 
 
 
@@ -649,7 +656,7 @@ if __name__ == '__main__':
     # plt.show()
     # plt.hist(trX[171,:, 1])
     # plt.show()
-    res, pcs = featureImportances(trX, data, var=[])
+    res, pcs = propPCA(trX, data, var=[])
     
     
     
