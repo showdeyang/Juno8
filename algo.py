@@ -9,7 +9,7 @@ from sklearn import preprocessing, linear_model
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.multioutput import MultiOutputRegressor
-from sklearn.linear_model import BayesianRidge, Ridge, LinearRegression
+from sklearn.linear_model import BayesianRidge, Ridge, LinearRegression, LassoCV, RidgeCV
 import sklearn.utils._cython_blas
 import sklearn.neighbors._typedefs
 import sklearn.tree
@@ -17,7 +17,7 @@ import sklearn.tree._utils
 import platform
 from sklearn.preprocessing import StandardScaler, PolynomialFeatures
 from sklearn.pipeline import Pipeline
-# from sklearn.svm import SVR
+from sklearn.svm import SVR
 from sklearn.decomposition import PCA, KernelPCA, SparsePCA
 import warnings
 # from numba import jit
@@ -627,19 +627,31 @@ def FIRF(trX, data):
     features = list(data.keys())
     
     d = trX[:,:,1].T
-    lags = 5
+    lags = 1
     inX = np.array([d[i-lags:i].flatten() for i, x in enumerate(d) if i>=lags])
     inY = d[lags:,:]
     
+    # inX1 = d[:-2,:]
+    # inX2 = d[1:-1,:]
+    # inX = inX2-inX1
+    
+    # # inY1 = d[1:-1,:]
+    # inY2 = d[2:,:]
+    # inY = inY2 
+    
+    
     # pipe = Pipeline([('scaler', StandardScaler()), ('knn', KNeighborsRegressor())])
-    pipe = Pipeline([('scaler', StandardScaler()), ('rf', MultiOutputRegressor(estimator=BayesianRidge()))])
-    pipe.fit(inX,inY)
+    # pipe = Pipeline([('scaler', StandardScaler()), ('rf', MultiOutputRegressor(estimator=RidgeCV()))])
+    pipe = Pipeline([('scaler', StandardScaler()),('ridge', MultiOutputRegressor(estimator=BayesianRidge()))])
+    pipe.fit(inX[:-20],inY[:-20])
     
     res = pipe.predict(inX)
-    
+    coefs = np.array([pipe[-1].estimators_[i].coef_ for i, fea in enumerate(features)])
+    # coefs=None
+    # coefs = np.array([pipe[-1].estimators_[i].feature_importances_ for i, fea in enumerate(features)])
     print('firf time', time.time()-t1)
     
-    return inX, inY, res
+    return inX, inY, res, coefs
     ...
 
 
@@ -679,15 +691,17 @@ if __name__ == '__main__':
     # plt.show()
     # res, pcs = propPCA(trX, data, var=[])
     
-    x,y, res = FIRF(trX, data)
-    plt.plot(y[:,175])
-    plt.plot(res[:, 175])
+    x,y, res, coefs = FIRF(trX, data)
+    plt.plot(y[-50:,175])
+    plt.plot(res[-50:, 175])
+    plt.axvline(len(y[-50:,175])-20)
     plt.show()
     
     
+    ind = var2ind('高效澄清池-TOC (mg/L)', data)
+    s = list(zip(data.keys(),coefs[ind]))
+    s = sorted(s, key=lambda x: np.abs(x[1]), reverse=True)
     
-    
-    
-    
+    pprint.pprint(s[:30])
     
     
