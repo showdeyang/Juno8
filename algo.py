@@ -17,19 +17,22 @@ import sklearn.tree._utils
 import platform
 from sklearn.preprocessing import StandardScaler, PolynomialFeatures
 from sklearn.pipeline import Pipeline
-from sklearn.svm import SVR
+# from sklearn.svm import SVR
 from sklearn.decomposition import PCA, KernelPCA, SparsePCA
 import warnings
-from numba import jit
+# from numba import jit
 # from multiprocessing import Pool
 from sklearn.impute import KNNImputer
 import time
 import json
-import functools
+# import functools
 from matplotlib import pyplot as plt
-import statistics
+# import statistics
 import pprint
 import datetime
+import pandas as pd
+# from statsmodels.tsa.ar_model import AutoReg
+from statsmodels.tsa.api import VAR
 
 if not sys.warnoptions:
     warnings.simplefilter("ignore")
@@ -46,20 +49,22 @@ else:
     encoding = 'gbk'
 
 def about(verbose=True):
-    d = {'version': '2.1.2',
-         'name': 'JunoAlgo',
-         'release': str(datetime.datetime.now()),
+    d = {'name': 'JunoAlgo',
          'author': 'Show De Yang',
          'company': 'DataHans, Juneng',
-         'python': 'cp37',
-         'changelog': [('2.0', 'Cython-precompiled algo, to improve performance.'),
+         'changelog': [('2.0', 'Cython-precompiled algo, to improve performance. Performance increased by 40% ~ 120%'),
                        ('2.1.0', 'Added algo.about() function to display metadata about algo.pyd.'),
              ('2.1.1', 'knnRegress: n_points change from 2000 to 6000 to allow for 15 years of data. Bug will occur when n_points < n(days in data).'),
-             ('2.1.2', 'pipe1 removed StandardScaler, LinearRegression added normalize=True')]
+             ('2.1.2', 'pipe1 removed StandardScaler, LinearRegression added normalize=True. Performance increased by 2%.'),
+             ('2.1.3', 'efficacy added success-rate estimation loop break by tolerance. Performance increased by 5% ~ 50%.')]
          }
+    d['release'] = str(datetime.datetime.now())
+    d['version'] = d['changelog'][-1][0]
+    d['python'] = ('.').join(map(str,sys.version_info[:3]))
     # print(d)
     if verbose:
         print('ABOUT ALGO')
+        # print('This is the precompiled algo.')
         pprint.pprint(d)
     return d
 
@@ -415,7 +420,7 @@ def efficacy(trX, strat, T, thresholds, typeDefs=None, startIndex=0, endIndex=No
         for j, thresh in enumerate(threshold):
             p = 50
             target = thresh[1]
-            tol = 0.005*target
+            tol = 0.01*target
             iterations = 100
             for iteration in range(iterations):
                 ps = np.array([np.clip(np.random.normal(p, p/10), 0, 100) for offspring in range(3)] + [p])
@@ -424,6 +429,8 @@ def efficacy(trX, strat, T, thresholds, typeDefs=None, startIndex=0, endIndex=No
                 p = ps[np.argmin(Ls)]
                 q = qs[np.argmin(Ls)]
                 e = Ls[np.argmin(Ls)]
+                if e < tol:
+                    break
             key = 'q' + str(100*THR[i][j][0]) + '%'
             riskIncrements[key] = 100*thresh[0]-p
             riskP[key] = p
@@ -442,7 +449,7 @@ def efficacy(trX, strat, T, thresholds, typeDefs=None, startIndex=0, endIndex=No
         for j, thresh in enumerate(threshold):
             p = 50
             target = thresh[1]
-            tol = 0.005*target
+            tol = 0.01*target
             iterations = 100
             for iteration in range(iterations):
                 ps = np.array([np.clip(np.random.normal(p, p/10), 0, 100) for offspring in range(3)] + [p])
@@ -451,6 +458,8 @@ def efficacy(trX, strat, T, thresholds, typeDefs=None, startIndex=0, endIndex=No
                 p = ps[np.argmin(Ls)]
                 q = qs[np.argmin(Ls)]
                 e = Ls[np.argmin(Ls)]
+                if e < tol:
+                    break
             key = 'q' + str(100*THR[i][j][0]) + '%'
             riskIncrements[key] = 100*thresh[0]-p
             riskP[key] = p
@@ -617,8 +626,20 @@ def FIRF(trX, data):
     t1 = time.time()
     features = list(data.keys())
     
+    d = trX[:,:,1].T
+    lags = 5
+    inX = np.array([d[i-lags:i].flatten() for i, x in enumerate(d) if i>=lags])
+    inY = d[lags:,:]
     
+    # pipe = Pipeline([('scaler', StandardScaler()), ('knn', KNeighborsRegressor())])
+    pipe = Pipeline([('scaler', StandardScaler()), ('rf', MultiOutputRegressor(estimator=BayesianRidge()))])
+    pipe.fit(inX,inY)
     
+    res = pipe.predict(inX)
+    
+    print('firf time', time.time()-t1)
+    
+    return inX, inY, res
     ...
 
 
@@ -656,10 +677,12 @@ if __name__ == '__main__':
     # plt.show()
     # plt.hist(trX[171,:, 1])
     # plt.show()
-    res, pcs = propPCA(trX, data, var=[])
+    # res, pcs = propPCA(trX, data, var=[])
     
-    
-    
+    x,y, res = FIRF(trX, data)
+    plt.plot(y[:,175])
+    plt.plot(res[:, 175])
+    plt.show()
     
     
     

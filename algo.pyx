@@ -45,18 +45,19 @@ else:
     newline = '\n'
     encoding = 'gbk'
 
-cpdef about(verbose=True):
-    d = {'version': '2.1.2',
-         'name': 'JunoAlgo',
-         'release': str(datetime.datetime.now()),
+def about(verbose=True):
+    d = {'name': 'JunoAlgo',
          'author': 'Show De Yang',
          'company': 'DataHans, Juneng',
-         'python': 'cp37',
-         'changelog': [('2.0', 'Cython-precompiled algo, to improve performance.'),
+         'changelog': [('2.0', 'Cython-precompiled algo, to improve performance. Performance increased by 40% ~ 120%'),
                        ('2.1.0', 'Added algo.about() function to display metadata about algo.pyd.'),
              ('2.1.1', 'knnRegress: n_points change from 2000 to 6000 to allow for 15 years of data. Bug will occur when n_points < n(days in data).'),
-             ('2.1.2', 'pipe1 removed StandardScaler, LinearRegression added normalize=True')]
+             ('2.1.2', 'pipe1 removed StandardScaler, LinearRegression added normalize=True. Performance increased by 2%.'),
+             ('2.1.3', 'efficacy added success-rate estimation loop break by tolerance. Performance increased by 5% ~ 50%.')]
          }
+    d['release'] = str(datetime.datetime.now())
+    d['version'] = d['changelog'][-1][0]
+    d['python'] = ('.').join(map(str,sys.version_info[:3]))
     # print(d)
     if verbose:
         print('ABOUT ALGO')
@@ -66,23 +67,23 @@ cpdef about(verbose=True):
 
 about()
 
-cpdef readJsonData(dataPath):
+def readJsonData(dataPath):
     with open(dataPath, 'r') as f:
         d = json.loads(f.read())
         
     dt = {key: [[i, float(value)] for i, value in enumerate(d[key]) if value] for key in d}
     return dt
 
-cpdef var2ind(var, data):
+def var2ind(var, data):
     features = list(data.keys())
     return features.index(var)
 
-cpdef ind2var(ind, data):
+def ind2var(ind, data):
     features = list(data.keys())
     return features[ind]
 
 
-cpdef g(v):
+def g(v):
     return v[0]
 
 
@@ -112,7 +113,7 @@ def syncX(X, Ts):
     
     return trX
 
-cpdef knnRegress(X, n_points=6000, verbose=False):
+def knnRegress(X, n_points=6000, verbose=False):
     # print(len(X))
     t1 = time.time()
     T = []
@@ -159,7 +160,7 @@ cpdef knnRegress(X, n_points=6000, verbose=False):
     return xnew
     
 
-cpdef crf(region, trX, typecpdefs, thresholds=None, errorAdjust=0):
+def crf(region, trX, typeDefs, thresholds=None, errorAdjust=0):
     region = np.array(region)
     filtered = []
     for i in range(len(trX[0])):
@@ -215,17 +216,17 @@ cpdef crf(region, trX, typecpdefs, thresholds=None, errorAdjust=0):
             d['STDEV'] = None
             d['MAE'] = None
 
-        if 0 <= typecpdefs[i] <= 1:
+        if 0 <= typeDefs[i] <= 1:
             if len(v) == 0:
                 if region[i][1] == np.inf:
                     val = np.mean([region[i][0], np.max(trX[i, : ,1])])
                 else:
                     val = np.mean(region[i])
-                J.append(typecpdefs[i] * val / np.mean(trX[i, :, 1]))
+                J.append(typeDefs[i] * val / np.mean(trX[i, :, 1]))
                 
             else:
-                J.append(typecpdefs[i] * np.mean(v) / np.mean(trX[i, :, 1]))
-        elif typecpdefs[i] > 1:
+                J.append(typeDefs[i] * np.mean(v) / np.mean(trX[i, :, 1]))
+        elif typeDefs[i] > 1:
             if not thresholds:
                 p_over = 0
             else:
@@ -238,7 +239,7 @@ cpdef crf(region, trX, typecpdefs, thresholds=None, errorAdjust=0):
                         p_over = (100-float(thresh.replace('q', '').replace('%', '')))*(1+(d[thresh] - threshold[thresh]) / threshold[thresh])
                         p_over *= float(thresh.replace('q', '').replace('%', ''))/100
                     
-                    R.append(typecpdefs[i]*p_over)
+                    R.append(typeDefs[i]*p_over)
             j += 1
         
         result['stats'].append(d)
@@ -252,7 +253,7 @@ cpdef crf(region, trX, typecpdefs, thresholds=None, errorAdjust=0):
     return result
 
 
-cpdef is_number(n):
+def is_number(n):
     try:
         float(n)   # Type-casting the string to `float`.
                    # If string is not a valid `float`,
@@ -271,20 +272,20 @@ class BarebonesLinearRegression(linear_model.LinearRegression):
     def predict(self, x):
         return np.matmul(x, self.coef_) + self.intercept_
 
-def strategy(trX, thresholds=None, typecpdefs=None, safety=1):
-    # if not typecpdefs:
-    #     typecpdefs = [-1]*len(inputVars) + [1/len(controlVars)]*len(controlVars) + [2]*len(outputVars)
-    if not typecpdefs:
-        print('ERROR: typecpdefs is None')
+def strategy(trX, thresholds=None, typeDefs=None, safety=1):
+    # if not typeDefs:
+    #     typeDefs = [-1]*len(inputVars) + [1/len(controlVars)]*len(controlVars) + [2]*len(outputVars)
+    if not typeDefs:
+        print('ERROR: typeDefs is None')
         return
     
     t0 = time.time()
     
-    typecpdefs = np.array(typecpdefs)
-    xinds = [i for i, td in enumerate(typecpdefs) if td < 0]
-    yinds = [i for i, td in enumerate(typecpdefs) if 0 <= td <= 1]
-    xyinds = [i for i, td in enumerate(typecpdefs) if td < 2] 
-    zinds = [i for i, td in enumerate(typecpdefs) if td >= 2]
+    typeDefs = np.array(typeDefs)
+    xinds = [i for i, td in enumerate(typeDefs) if td < 0]
+    yinds = [i for i, td in enumerate(typeDefs) if 0 <= td <= 1]
+    xyinds = [i for i, td in enumerate(typeDefs) if td < 2] 
+    zinds = [i for i, td in enumerate(typeDefs) if td >= 2]
     
     X = trX[xinds, :, 1].T
     Y = trX[yinds, :, 1].T
@@ -310,10 +311,10 @@ def strategy(trX, thresholds=None, typecpdefs=None, safety=1):
     Y1 = []
     
     def J(Y_var):
-        return np.matmul(Y_var/np.mean(Y, axis=0), typecpdefs[yinds])
+        return np.matmul(Y_var/np.mean(Y, axis=0), typeDefs[yinds])
     
     def R(Z_var):
-        return np.matmul(np.array([[np.max([THR[j][i][0]*np.clip(z[j] - THR[j][i][1], 0, np.inf) for i, thresh in enumerate(threshold)]) for j, threshold in enumerate(thresholds)] for z in Z_var]) / np.mean(Z, axis=0), typecpdefs[zinds])
+        return np.matmul(np.array([[np.max([THR[j][i][0]*np.clip(z[j] - THR[j][i][1], 0, np.inf) for i, thresh in enumerate(threshold)]) for j, threshold in enumerate(thresholds)] for z in Z_var]) / np.mean(Z, axis=0), typeDefs[zinds])
     
     # xys = [[*(X[i]), *y] for i, y in enumerate(Y)]
     xys = np.c_[X,Y]
@@ -367,19 +368,19 @@ def strategy(trX, thresholds=None, typecpdefs=None, safety=1):
     return S, T
     
 
-cpdef efficacy(trX, strat, T, thresholds, typecpdefs=None, startIndex=0, endIndex=None, verbose=False):
-    # if not typecpdefs:
-    #     typecpdefs = [-1]*len(inputVars) + [1/len(controlVars)]*len(controlVars) + [2]*len(outputVars)
+def efficacy(trX, strat, T, thresholds, typeDefs=None, startIndex=0, endIndex=None, verbose=False):
+    # if not typeDefs:
+    #     typeDefs = [-1]*len(inputVars) + [1/len(controlVars)]*len(controlVars) + [2]*len(outputVars)
 
-    if not typecpdefs:
-        print('ERROR: typecpdefs is None')
+    if not typeDefs:
+        print('ERROR: typeDefs is None')
         return
     
-    typecpdefs = np.array(typecpdefs)
-    xinds = [i for i, td in enumerate(typecpdefs) if td < 0]
-    yinds = [i for i, td in enumerate(typecpdefs) if 0 <= td <= 1]
-    xyinds = [i for i, td in enumerate(typecpdefs) if td < 2]
-    zinds = [i for i, td in enumerate(typecpdefs) if td >= 2]
+    typeDefs = np.array(typeDefs)
+    xinds = [i for i, td in enumerate(typeDefs) if td < 0]
+    yinds = [i for i, td in enumerate(typeDefs) if 0 <= td <= 1]
+    xyinds = [i for i, td in enumerate(typeDefs) if td < 2]
+    zinds = [i for i, td in enumerate(typeDefs) if td >= 2]
     
     X = trX[xinds, :, 1]
     Y = trX[yinds, :, 1]
@@ -416,7 +417,7 @@ cpdef efficacy(trX, strat, T, thresholds, typecpdefs=None, startIndex=0, endInde
         for j, thresh in enumerate(threshold):
             p = 50
             target = thresh[1]
-            tol = 0.005*target
+            tol = 0.01*target
             iterations = 100
             for iteration in range(iterations):
                 ps = np.array([np.clip(np.random.normal(p, p/10), 0, 100) for offspring in range(3)] + [p])
@@ -425,6 +426,8 @@ cpdef efficacy(trX, strat, T, thresholds, typecpdefs=None, startIndex=0, endInde
                 p = ps[np.argmin(Ls)]
                 q = qs[np.argmin(Ls)]
                 e = Ls[np.argmin(Ls)]
+                if e < tol:
+                    break
             key = 'q' + str(100*THR[i][j][0]) + '%'
             riskIncrements[key] = 100*thresh[0]-p
             riskP[key] = p
@@ -443,7 +446,7 @@ cpdef efficacy(trX, strat, T, thresholds, typecpdefs=None, startIndex=0, endInde
         for j, thresh in enumerate(threshold):
             p = 50
             target = thresh[1]
-            tol = 0.005*target
+            tol = 0.01*target
             iterations = 100
             for iteration in range(iterations):
                 ps = np.array([np.clip(np.random.normal(p, p/10), 0, 100) for offspring in range(3)] + [p])
@@ -452,6 +455,8 @@ cpdef efficacy(trX, strat, T, thresholds, typecpdefs=None, startIndex=0, endInde
                 p = ps[np.argmin(Ls)]
                 q = qs[np.argmin(Ls)]
                 e = Ls[np.argmin(Ls)]
+                if e < tol:
+                    break
             key = 'q' + str(100*THR[i][j][0]) + '%'
             riskIncrements[key] = 100*thresh[0]-p
             riskP[key] = p
@@ -468,7 +473,7 @@ cpdef efficacy(trX, strat, T, thresholds, typecpdefs=None, startIndex=0, endInde
     
     return decisions, predZ, consumptions, risks
 
-cpdef knnR(data, time_dimension=True, verbose=False):
+def knnR(data, time_dimension=True, verbose=False):
     t1 = time.time()
     print('Regressing data... This may take a while...')
     trX = knnRegress([data[feature] for feature in  data], verbose=verbose)
@@ -484,14 +489,14 @@ cpdef knnR(data, time_dimension=True, verbose=False):
 
 
 class analysis:
-    def __init__(self, data, inputVars, controlVars, outputVars, thresholds, typecpdefs=None, safety=0.7, startIndex=None, endIndex=None, verbose=True):
+    def __init__(self, data, inputVars, controlVars, outputVars, thresholds, typeDefs=None, safety=0.7, startIndex=None, endIndex=None, verbose=True):
         # startIndex 和 endIndex 必须都要为负数
         print('ELAPSE TIME BREAKDOWN')
         t1 = time.time()
-        xinds = [i for i, td in enumerate(typecpdefs) if td < 0]
-        yinds = [i for i, td in enumerate(typecpdefs) if 0 <= td <= 1]
-        # xyinds = [i for i, td in enumerate(typecpdefs) if td < 2]
-        zinds = [i for i, td in enumerate(typecpdefs) if td >= 2]
+        xinds = [i for i, td in enumerate(typeDefs) if td < 0]
+        yinds = [i for i, td in enumerate(typeDefs) if 0 <= td <= 1]
+        # xyinds = [i for i, td in enumerate(typeDefs) if td < 2]
+        zinds = [i for i, td in enumerate(typeDefs) if td >= 2]
         
         txs = [data[feature] for feature in inputVars + controlVars + outputVars]
         #maxT = np.max(np.array([data[feature] for feature in data][0])[:, 0])
@@ -510,7 +515,7 @@ class analysis:
         self.controlVars = controlVars
         self.outputVars = outputVars
         self.thresholds = thresholds
-        self.typecpdefs = typecpdefs
+        self.typeDefs = typeDefs
         self.safety = safety
         self.startIndex = startIndex
         self.endIndex = endIndex
@@ -540,9 +545,9 @@ class analysis:
         
         self.S_hm = lambda x: strat.predict(x)
         t6 = time.time()
-        self.S, self.T = strategy(self.trX, thresholds=self.thresholds, typecpdefs=self.typecpdefs, safety=self.safety)
+        self.S, self.T = strategy(self.trX, thresholds=self.thresholds, typeDefs=self.typeDefs, safety=self.safety)
         t7 = time.time()
-        self.Yopt, self.Zopt, consumptions, risks = efficacy(self.trX, strat=self.S, T=self.T, typecpdefs=self.typecpdefs, thresholds=self.thresholds, startIndex=self.startIndex, endIndex=self.endIndex, verbose=self.verbose)
+        self.Yopt, self.Zopt, consumptions, risks = efficacy(self.trX, strat=self.S, T=self.T, typeDefs=self.typeDefs, thresholds=self.thresholds, startIndex=self.startIndex, endIndex=self.endIndex, verbose=self.verbose)
         
         self.consumptions = dict(zip(self.controlVars, consumptions))
         self.risks = dict(zip(self.outputVars, risks))
@@ -560,7 +565,7 @@ class analysis:
             
         region = rx + ry + rz
         
-        result = crf(region, trX=self.trX, typecpdefs=self.typecpdefs, thresholds=self.thresholds)
+        result = crf(region, trX=self.trX, typeDefs=self.typeDefs, thresholds=self.thresholds)
         
         class crfRes():
             def __init__(self, result):
@@ -573,7 +578,7 @@ class analysis:
 
 
 
-def featureImportances(trX, data, var=None, n_components=None):
+def propPCA(trX, data, var=None, n_components=None):
     t1 = time.time()
     features = list(data.keys())
     # ind = var2ind(var, data)
@@ -583,8 +588,9 @@ def featureImportances(trX, data, var=None, n_components=None):
     pca = pipe[1]
     vrs = pca.explained_variance_ratio_ #85 most important principle components such that sum(vrs) > 0.95
     
-    thr = np.percentile(vrs, 90)
+    thr = np.percentile(vrs, 95)
     c = len(vrs[vrs>=thr])
+    print('components', c)
     pcs = np.abs(pca.components_)[:c] #principle components
     thresh = np.percentile(pcs, 95)
     res = []
@@ -612,7 +618,14 @@ def featureImportances(trX, data, var=None, n_components=None):
     print('命题数量', len(result))
     return result, pcs
 
-
+def FIRF(trX, data):
+    
+    t1 = time.time()
+    features = list(data.keys())
+    
+    
+    
+    ...
 
 
 
@@ -621,26 +634,26 @@ if __name__ == '__main__':
     plt.style.use('dark_background')
     data = readJsonData(path / 'JunoProject' / '示例项目' / 'value.json')
     
-    features = list(data.keys())
+    # features = list(data.keys())
     
-    inputVars = ['二沉池混合后-TP (mg/L)', '二沉池混合后-SS (mg/L)']
-    controlVars = ['高效澄清池-PAC(投加量) (mg/L)', '高效澄清池-PAM(投加量) (mg/L)']
-    outputVars = ['排放池-TP在线 (mg/L)', '高效澄清池-SS (mg/L)']
+    # inputVars = ['二沉池混合后-TP (mg/L)', '二沉池混合后-SS (mg/L)']
+    # controlVars = ['高效澄清池-PAC(投加量) (mg/L)', '高效澄清池-PAM(投加量) (mg/L)']
+    # outputVars = ['排放池-TP在线 (mg/L)', '高效澄清池-SS (mg/L)']
     
-    # inputVars = ['二沉池混合后-TOC (mg/L)', '缺氧池B（D-N）-NO3-N (mg/L)']
-    # controlVars = ['高效澄清池-粉炭4(投加量) (mg/L)']
-    # outputVars = ['高效澄清池-TOC (mg/L)']
+    # # inputVars = ['二沉池混合后-TOC (mg/L)', '缺氧池B（D-N）-NO3-N (mg/L)']
+    # # controlVars = ['高效澄清池-粉炭4(投加量) (mg/L)']
+    # # outputVars = ['高效澄清池-TOC (mg/L)']
     
-    typecpdefs = [-1]*len(inputVars) + [1/len(controlVars)]*len(controlVars) + [2]*len(outputVars)
+    # typeDefs = [-1]*len(inputVars) + [1/len(controlVars)]*len(controlVars) + [2]*len(outputVars)
     
     
-    t1 = time.time()
+    # t1 = time.time()
     
-    thresholds = [{'q99%': 0.5}, {'q99%': 9, 'q80%': 7}]
-    A = analysis(data, inputVars, controlVars, outputVars, thresholds, typecpdefs, safety=0.5, verbose=True)
-    print(A.risks)
-    print(A.consumptions)
-    print('time taken', time.time()-t1)
+    # thresholds = [{'q99%': 0.5}, {'q99%': 9, 'q80%': 7}]
+    # A = analysis(data, inputVars, controlVars, outputVars, thresholds, typeDefs, safety=0.5, verbose=True)
+    # print(A.risks)
+    # print(A.consumptions)
+    # print('time taken', time.time()-t1)
     
     ##########################
     # data = readJsonData('C:/Users/showd/code/Juno8/JunoProject/江宁化工/value.json')
@@ -649,7 +662,7 @@ if __name__ == '__main__':
     # plt.show()
     # plt.hist(trX[171,:, 1])
     # plt.show()
-    res, pcs = featureImportances(trX, data, var=[])
+    res, pcs = propPCA(trX, data, var=[])
     
     
     
