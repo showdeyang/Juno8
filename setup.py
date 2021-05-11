@@ -9,3 +9,7 @@ Cython.Compiler.Options.annotate = True
 setup(
     ext_modules = cythonize("algo.pyx", annotate=False), include_dirs=[numpy.get_include()]
 )
+
+setup(
+    ext_modules = cythonize("main.pyx", annotate=False), include_dirs=[numpy.get_include()]
+)

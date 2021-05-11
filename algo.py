@@ -621,39 +621,54 @@ def propPCA(trX, data, var=None, n_components=None):
     print('命题数量', len(result))
     return result, pcs
 
-def FIRF(trX, data):
+class MORFI(object):
+    #MultiOutput Regressor-based Feature Importances
+    def __init__(self, trX, data):
+        t1 = time.time()
+        self.features = list(data.keys())
+        
+        d = trX[:,:,1].T
+        lags = 1
+        inX = np.array([d[i-lags:i].flatten() for i, x in enumerate(d) if i>=lags])
+        inY = d[lags:,:]
+        
+        # inX1 = d[:-2,:]
+        # inX2 = d[1:-1,:]
+        # inX = inX2-inX1
+        
+        # # inY1 = d[1:-1,:]
+        # inY2 = d[2:,:]
+        # inY = inY2 
+        
+        
+        # pipe = Pipeline([('scaler', StandardScaler()), ('knn', KNeighborsRegressor())])
+        # pipe = Pipeline([('scaler', StandardScaler()), ('rf', MultiOutputRegressor(estimator=RidgeCV()))])
+        pipe = Pipeline([('scaler', StandardScaler()),('ridge', MultiOutputRegressor(estimator=BayesianRidge(), n_jobs=-1))])
+        pipe.fit(inX, inY)
+        
+        res = pipe.predict(inX)
+        
+        
+        coefs = np.array([pipe[-1].estimators_[i].coef_ / np.max(np.abs(pipe[-1].estimators_[i].coef_)) for i, fea in enumerate(self.features)])
+        # coefs=None
+        # coefs = np.array([pipe[-1].estimators_[i].feature_importances_ for i, fea in enumerate(features)])
+        print('firf time', time.time()-t1)
+        self.data = data
+        self.X = inX
+        self.Y = inY
+        self.coefs = coefs
+        self.Ypred = res
+        
+        
+        
+    def fi(self, var, n_features=None, verbose=False):
+        ind = var2ind(var, self.data)
+        s = list(zip(self.features,self.coefs[ind]))
+        s = sorted(s, key=lambda x: np.abs(x[1]), reverse=True)[:n_features]
+        if verbose:
+            pprint.pprint(s)
+        return s
     
-    t1 = time.time()
-    features = list(data.keys())
-    
-    d = trX[:,:,1].T
-    lags = 1
-    inX = np.array([d[i-lags:i].flatten() for i, x in enumerate(d) if i>=lags])
-    inY = d[lags:,:]
-    
-    # inX1 = d[:-2,:]
-    # inX2 = d[1:-1,:]
-    # inX = inX2-inX1
-    
-    # # inY1 = d[1:-1,:]
-    # inY2 = d[2:,:]
-    # inY = inY2 
-    
-    
-    # pipe = Pipeline([('scaler', StandardScaler()), ('knn', KNeighborsRegressor())])
-    # pipe = Pipeline([('scaler', StandardScaler()), ('rf', MultiOutputRegressor(estimator=RidgeCV()))])
-    pipe = Pipeline([('scaler', StandardScaler()),('ridge', MultiOutputRegressor(estimator=BayesianRidge()))])
-    pipe.fit(inX[:-20],inY[:-20])
-    
-    res = pipe.predict(inX)
-    coefs = np.array([pipe[-1].estimators_[i].coef_ for i, fea in enumerate(features)])
-    # coefs=None
-    # coefs = np.array([pipe[-1].estimators_[i].feature_importances_ for i, fea in enumerate(features)])
-    print('firf time', time.time()-t1)
-    
-    return inX, inY, res, coefs
-    ...
-
 
 
 
@@ -691,17 +706,6 @@ if __name__ == '__main__':
     # plt.show()
     # res, pcs = propPCA(trX, data, var=[])
     
-    x,y, res, coefs = FIRF(trX, data)
-    plt.plot(y[-50:,175])
-    plt.plot(res[-50:, 175])
-    plt.axvline(len(y[-50:,175])-20)
-    plt.show()
-    
-    
-    ind = var2ind('高效澄清池-TOC (mg/L)', data)
-    s = list(zip(data.keys(),coefs[ind]))
-    s = sorted(s, key=lambda x: np.abs(x[1]), reverse=True)
-    
-    pprint.pprint(s[:30])
-    
+    morfi = MORFI(trX, data)
+    fi = morfi.fi('高效澄清池-粉炭(投加量) (mg/L)', n_features=20, verbose=True)
     
