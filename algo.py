@@ -621,6 +621,44 @@ def propPCA(trX, data, var=None, n_components=None):
     print('命题数量', len(result))
     return result, pcs
 
+class process(object):
+    def __init__(self, trX, data):
+        # here inserts the algorithm for learning the process. I used a generic process as an example.
+        
+        features = list(data.keys())
+        delimiters = ['_','-']
+        for delimiter in delimiters:
+            if delimiter in (',').join(features):
+                break
+        
+        extracted =  [feature.split(delimiter)[0].strip() for feature in features]
+        
+        pools = []
+        for pool in extracted:
+            if pool not in pools:
+                pools.append(pool)
+        
+        self.features = features
+        self.delimiters = delimiters
+        self.pools = pools
+        
+    def order(self, var):
+        #var is something like '高效澄清池-TOC (mg/L)'
+        for ind, pool in enumerate(self.pools):
+            if pool in var:
+                return ind
+        
+        return None
+    
+    def dist(self, var1, var2):
+        # distance of var2 from var1
+        try:
+            d = self.order(var2) - self.order(var1)
+        except TypeError:
+            d = None
+        
+        return d
+    
 class MORFI(object):
     #MultiOutput Regressor-based Feature Importances
     def __init__(self, trX, data):
@@ -660,15 +698,44 @@ class MORFI(object):
         self.Ypred = res
         
         
+    def fi(self, var, n_features=None, verbose=False, proc=True):
         
-    def fi(self, var, n_features=None, verbose=False):
         ind = var2ind(var, self.data)
-        s = list(zip(self.features,self.coefs[ind]))
-        s = sorted(s, key=lambda x: np.abs(x[1]), reverse=True)[:n_features]
+        
+        if proc:
+            prc = process(trX, data)
+            self.prc = prc
+            ds = list(map( lambda fea: self.prc.dist(var, fea),  self.features))
+        
+            s = list(zip(self.features,self.coefs[ind], ds))
+        else:
+            s = list(zip(self.features,self.coefs[ind]))
+            
+        if proc:
+            prc = process(trX, data)
+            self.prc = prc
+            s = filter(lambda x: -3 <= x[2] <= 2 , sorted(s, key=lambda x: x[2]))
+            s = sorted(s, key=lambda x: np.abs(x[1]) , reverse=True)[:n_features]
+            
+        else:
+            s = sorted(s, key=lambda x: np.abs(x[1]) , reverse=True)[:n_features]
+            
+        
+        
         if verbose:
             pprint.pprint(s)
-        return s
+        return s    
+        
+def crossPlot(varX, varY, trX, data):
+    indX = var2ind(varX, data)
+    indY = var2ind(varY, data)
+    x = trX[indX,:,1]
+    y = trX[indY,:,1]       
+    plt.scatter(x,y, s=5)
+    plt.xlabel(varX)
+    plt.ylabel(varY)
     
+        
 
 
 
@@ -683,7 +750,7 @@ if __name__ == '__main__':
     # outputVars = ['排放池-TP在线 (mg/L)', '高效澄清池-SS (mg/L)']
     
     # # inputVars = ['二沉池混合后-TOC (mg/L)', '缺氧池B（D-N）-NO3-N (mg/L)']
-    # # controlVars = ['高效澄清池-粉炭4(投加量) (mg/L)']
+    # # controlVars = ['高效澄清池-粉炭(投加量) (mg/L)']
     # # outputVars = ['高效澄清池-TOC (mg/L)']
     
     # typeDefs = [-1]*len(inputVars) + [1/len(controlVars)]*len(controlVars) + [2]*len(outputVars)
@@ -707,5 +774,9 @@ if __name__ == '__main__':
     # res, pcs = propPCA(trX, data, var=[])
     
     morfi = MORFI(trX, data)
-    fi = morfi.fi('高效澄清池-粉炭(投加量) (mg/L)', n_features=20, verbose=True)
+    fi = morfi.fi('高效澄清池-粉炭(投加量) (mg/L)', n_features=200, verbose=True)
     
+    prc = process(trX, data)
+    print(prc.pools)
+    
+    crossPlot('高效澄清池-粉炭(投加量) (mg/L)', '高效澄清池-TOC (mg/L)', trX, data)
