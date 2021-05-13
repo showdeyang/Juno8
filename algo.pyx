@@ -9,7 +9,7 @@ from sklearn import preprocessing, linear_model
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.multioutput import MultiOutputRegressor
-from sklearn.linear_model import BayesianRidge, Ridge, LinearRegression
+from sklearn.linear_model import BayesianRidge, Ridge, LinearRegression, LassoCV, RidgeCV
 import sklearn.utils._cython_blas
 import sklearn.neighbors._typedefs
 import sklearn.tree
@@ -20,16 +20,20 @@ from sklearn.pipeline import Pipeline
 from sklearn.svm import SVR
 from sklearn.decomposition import PCA, KernelPCA, SparsePCA
 import warnings
-from numba import jit
+# from numba import jit
 # from multiprocessing import Pool
 from sklearn.impute import KNNImputer
 import time
 import json
-import functools
+# import functools
 from matplotlib import pyplot as plt
-import statistics
+# import statistics
 import pprint
 import datetime
+import pandas as pd
+# from statsmodels.tsa.ar_model import AutoReg
+from functools import reduce
+import itertools
 
 if not sys.warnoptions:
     warnings.simplefilter("ignore")
@@ -53,7 +57,10 @@ def about(verbose=True):
                        ('2.1.0', 'Added algo.about() function to display metadata about algo.pyd.'),
              ('2.1.1', 'knnRegress: n_points change from 2000 to 6000 to allow for 15 years of data. Bug will occur when n_points < n(days in data).'),
              ('2.1.2', 'pipe1 removed StandardScaler, LinearRegression added normalize=True. Performance increased by 2%.'),
-             ('2.1.3', 'efficacy added success-rate estimation loop break by tolerance. Performance increased by 5% ~ 50%.')]
+             ('2.1.3', 'efficacy added success-rate estimation loop break by tolerance. Performance increased by 5% ~ 50%.'),
+             ('2.2', 'Proposition Discovery Algorithm.'), 
+             ('2.2.1', 'fixed some small bugs in MORFI.'),
+             ('2.2.2', 'fixed typeDefs bug in MORFI.')]
          }
     d['release'] = str(datetime.datetime.now())
     d['version'] = d['changelog'][-1][0]
@@ -140,7 +147,7 @@ def knnRegress(X, n_points=6000, verbose=False):
     
     inX = trX[:, :, 1].T
 
-    imputer = KNNImputer( weights='distance' ) #,n_neighbors=n_points
+    imputer = KNNImputer(n_neighbors=100000) # weights='distance'
     xnew = imputer.fit_transform(inX)
     xnew = xnew.T
     
@@ -618,15 +625,231 @@ def propPCA(trX, data, var=None, n_components=None):
     print('命题数量', len(result))
     return result, pcs
 
-def FIRF(trX, data):
+class process(object):
+    def __init__(self, trX, data):
+        # here inserts the algorithm for learning the process. I used a generic process as an example.
+        
+        features = list(data.keys())
+        delimiters = ['_','-']
+        for delimiter in delimiters:
+            if delimiter in (',').join(features):
+                break
+        
+        extracted =  [feature.split(delimiter)[0].strip() for feature in features]
+        
+        pools = []
+        for pool in extracted:
+            if pool not in pools:
+                pools.append(pool)
+        
+        self.features = features
+        self.delimiters = delimiters
+        self.pools = pools
+        
+    def order(self, var):
+        #var is something like '高效澄清池-TOC (mg/L)'
+        for ind, pool in enumerate(self.pools):
+            if pool in var:
+                return ind
+        
+        return None
     
-    t1 = time.time()
-    features = list(data.keys())
-    
-    
-    
-    ...
+    def dist(self, var1, var2):
+        # distance of var2 from var1
+        try:
+            d = self.order(var2) - self.order(var1)
+        except TypeError:
+            d = None
+        
+        return d
 
+def taylor_series(A, power=20):
+    # matrices = [(1/math.factorial(exponent))*np.linalg.matrix_power(A, exponent) for exponent in range(power)]
+    matrices = [(1/math.factorial(exponent))*np.linalg.matrix_power(A, exponent) for exponent in range(1,power)]
+    res = reduce(np.add, matrices)
+    return res
+
+    
+class MORFI(object):
+    #MultiOutput Regressor-based Feature Importances
+    def __init__(self, trX, data, yvars):
+        t1 = time.time()
+        self.features = list(data.keys())
+        
+        d = trX[:,:,1].T
+        lags = 1
+        inX = np.array([d[i-lags:i].flatten() for i, x in enumerate(d) if i>=lags])
+        inY = d[lags:,:]
+        
+        # inX1 = d[:-2,:]
+        # inX2 = d[1:-1,:]
+        # inX = inX2-inX1
+        
+        # # inY1 = d[1:-1,:]
+        # inY2 = d[2:,:]
+        # inY = inY2 
+        
+        
+        # pipe = Pipeline([('scaler', StandardScaler()), ('knn', KNeighborsRegressor())])
+        # pipe = Pipeline([('scaler', StandardScaler()), ('rf', MultiOutputRegressor(estimator=RidgeCV()))])
+        pipe = Pipeline([('scaler', StandardScaler()),('ridge', MultiOutputRegressor(estimator=BayesianRidge(), n_jobs=-1))])
+        pipe.fit(inX, inY)
+        
+        res = pipe.predict(inX)
+        
+        
+        coefs = np.array([pipe[-1].estimators_[i].coef_ / np.max(np.abs(pipe[-1].estimators_[i].coef_)) for i, fea in enumerate(self.features)])
+        # coefs=None
+        # coefs = np.array([pipe[-1].estimators_[i].feature_importances_ for i, fea in enumerate(features)])
+        
+        # coefs = coefs**3 / np.sum(coefs**3,axis=1)
+        
+        coefs = np.nan_to_num(coefs)
+        # coefs[coefs > 0.5] = 1
+        
+        # coefs[coefs <= -0.5] = -1
+        
+        
+        coefsLower = np.tril(coefs)
+        coefsUpper = np.triu(coefs)
+        
+        # print(coefs.tolist())
+        # coefs = np.sum([np.linalg.matrix_power(coefs, i) for i in range(5)])
+        # coefs = 1 + coefs + 0.5* np.linalg.matrix_power(coefs, 2) + (1/6)* np.linalg.matrix_power(coefs, 3) +  (1/24)* np.linalg.matrix_power(coefs, 4) +  (1/120)* np.linalg.matrix_power(coefs, 5) +  (1/720)* np.linalg.matrix_power(coefs, 6)
+        
+        # coefs = taylor_series(coefs, power=100)
+        coefsForward =  taylor_series(coefsUpper, power=20)
+        coefsBackward =  taylor_series(coefsLower, power=20)
+        
+        print('morfi time', time.time()-t1)
+        self.data = data
+        self.trX = trX
+        self.X = inX
+        self.Y = inY
+        self.coefs = coefs
+        self.coefsLower = coefsLower
+        self.coefsUpper = coefsUpper 
+        self.coefsForward = coefsForward
+        self.coefsBackward = coefsBackward
+        
+        
+        self.Ypred = res
+        
+        
+    def fi(self, var, n_features=None, verbose=False, traverse=0):
+        
+        if traverse == 0:
+            coefs = self.coefs
+        elif traverse > 0:
+            coefs = self.coefsForward
+        elif traverse < 0:
+            coefs = self.coefsBackward
+        else:
+            coefs = self.coefs
+        
+        
+        ind = var2ind(var, self.data)
+        # print("analyzing", var)
+        
+        prc = process(self.trX, self.data)
+        self.prc = prc
+        ds = list(map( lambda fea: self.prc.dist(var, fea),  self.features))
+        orders = list(map(lambda fea: prc.order(fea), self.features))
+        s = list(zip(self.features, coefs[ind], ds, orders))
+        
+        prc = process(self.trX, self.data)
+        self.prc = prc
+        # s = filter(lambda x: -3 <= x[2] <= 2 , sorted(s, key=lambda x: x[2]))
+        s = sorted(s, key=lambda x: np.abs(x[1]) , reverse=True)[:n_features]
+        
+        if verbose:
+            pprint.pprint(s)
+        return s    
+    
+    def y2z(self, yvar, yvars, n_features=20):
+        fi = self.fi(yvar, n_features=n_features, traverse=1)
+        fiz = list(filter(lambda x: x[0] not in yvars, fi))
+        return fiz
+    
+    def z2xy(self, zvar, yvar, yvars, n_features=2):
+        currentOrder = self.prc.order(yvar)
+        # print('currentOrder', currentOrder)
+        fi = self.fi(zvar, n_features=n_features, traverse=-1)
+        fi = list(filter(lambda x: x[3] < currentOrder, fi))
+        
+        fiy = list(filter(lambda x: x[0] in yvars, fi))
+        fix = list(filter(lambda x: x[0] not in yvars, fi))
+        
+        
+        return fix, fiy
+    
+    def Z2XY(self, fiz, yvar, yvars, n_features=2):
+        res = list(map( lambda fz: self.z2xy(fz[0], yvar=yvar, yvars=yvars, n_features=n_features), fiz))
+        
+        #merging fix and fiy
+        res = list(zip(*res))
+        x = [list(map(lambda row: row[0], case)) for case in res[0]]
+        y = [list(map(lambda row: row[0], case)) for case in res[1]]
+        
+        x = sorted(list(set(itertools.chain(*x))))
+        y = sorted(list(set(itertools.chain(*y))))
+        if yvar not in y:
+            y.append(yvar)
+        return x,y
+    
+    def xyz(self, yvar, yvars, verbose=False, nz=5, nxy=2):
+        fiz = self.y2z(yvar, yvars, n_features=nz*4)
+        x,y = self.Z2XY(fiz, yvar, yvars, n_features=nxy)
+        z = list(map(lambda fz: fz[0], fiz[:nz]))
+        for xv in x:
+            if '日期' in xv or 'ate' in xv.lower() or 'ime' in xv.lower():
+                x.remove(xv)
+                
+        if verbose:
+            print('x')
+            pprint.pprint(x)
+            print('y')
+            pprint.pprint(y)
+            print('z')
+            pprint.pprint(z)
+        
+        return x,y,z
+
+    def XYZ(self, yvars):
+        props = []
+        for yvar in yvars:
+            
+            x,y,z = self.xyz(yvar, yvars)
+            thresholds = []
+            for zvar in z:
+                threshold = {}
+                
+                threshold['q99%'] = np.percentile([v[1] for v in self.trX[var2ind(zvar, self.data)]], 70)
+                threshold['q80%'] = np.percentile([v[1] for v in self.trX[var2ind(zvar, self.data)]], 60)
+                thresholds.append(threshold)
+            
+            prop = {}
+            prop['name'] = '基于' + (',').join(y).replace('(mg/L)','').replace('（mg/L）','').strip() + '的命题'
+            prop['inputVars'] = x
+            prop['controlVars'] = y
+            prop['outputVars'] = z
+            prop['typeDefs'] = [-1]*len(x) + [1/len(y)]*len(y) + [2]*len(z)
+            prop['safety'] = 0.5
+            prop['thresholds'] = thresholds
+            
+            props.append(prop)
+        return props
+        
+def crossPlot(varX, varY, trX, data):
+    indX = var2ind(varX, data)
+    indY = var2ind(varY, data)
+    x = trX[indX,:,1]
+    y = trX[indY,:,1]       
+    plt.scatter(x,y, s=5)
+    plt.xlabel(varX)
+    plt.ylabel(varY)
+    
+        
 
 
 
@@ -634,26 +857,26 @@ if __name__ == '__main__':
     plt.style.use('dark_background')
     data = readJsonData(path / 'JunoProject' / '示例项目' / 'value.json')
     
-    # features = list(data.keys())
+    features = list(data.keys())
     
-    # inputVars = ['二沉池混合后-TP (mg/L)', '二沉池混合后-SS (mg/L)']
-    # controlVars = ['高效澄清池-PAC(投加量) (mg/L)', '高效澄清池-PAM(投加量) (mg/L)']
-    # outputVars = ['排放池-TP在线 (mg/L)', '高效澄清池-SS (mg/L)']
+    inputVars = ['二沉池混合后-TP (mg/L)', '二沉池混合后-SS (mg/L)']
+    controlVars = ['高效澄清池-PAC(投加量) (mg/L)', '高效澄清池-PAM(投加量) (mg/L)']
+    outputVars = ['排放池-TP在线 (mg/L)', '高效澄清池-SS (mg/L)']
     
-    # # inputVars = ['二沉池混合后-TOC (mg/L)', '缺氧池B（D-N）-NO3-N (mg/L)']
-    # # controlVars = ['高效澄清池-粉炭4(投加量) (mg/L)']
-    # # outputVars = ['高效澄清池-TOC (mg/L)']
+    # inputVars = ['二沉池混合后-TOC (mg/L)', '缺氧池B（D-N）-NO3-N (mg/L)']
+    # controlVars = ['高效澄清池-粉炭(投加量) (mg/L)']
+    # outputVars = ['高效澄清池-TOC (mg/L)']
     
-    # typeDefs = [-1]*len(inputVars) + [1/len(controlVars)]*len(controlVars) + [2]*len(outputVars)
+    typeDefs = [-1]*len(inputVars) + [1/len(controlVars)]*len(controlVars) + [2]*len(outputVars)
     
     
-    # t1 = time.time()
+    t1 = time.time()
     
-    # thresholds = [{'q99%': 0.5}, {'q99%': 9, 'q80%': 7}]
-    # A = analysis(data, inputVars, controlVars, outputVars, thresholds, typeDefs, safety=0.5, verbose=True)
-    # print(A.risks)
-    # print(A.consumptions)
-    # print('time taken', time.time()-t1)
+    thresholds = [{'q99%': 0.5}, {'q99%': 9, 'q80%': 7}]
+    A = analysis(data, inputVars, controlVars, outputVars, thresholds, typeDefs, safety=0.5, verbose=True)
+    print(A.risks)
+    print(A.consumptions)
+    print('time taken', time.time()-t1)
     
     ##########################
     # data = readJsonData('C:/Users/showd/code/Juno8/JunoProject/江宁化工/value.json')
@@ -662,15 +885,15 @@ if __name__ == '__main__':
     # plt.show()
     # plt.hist(trX[171,:, 1])
     # plt.show()
-    res, pcs = propPCA(trX, data, var=[])
+    # res, pcs = propPCA(trX, data, var=[])
+    
+    yvars = ['高效澄清池-PAC (kg/d)', '高效澄清池-PAM (kg/d)','臭氧池-臭氧产量 （kg/h）','臭氧池-功率 (kWh)' ,'高效澄清池-粉炭 (kg/d)','CBR池A-DO (mg/L)','活性污泥池A（ASR）-DO (mg/L)', '活性污泥池B（ASR）-DO (mg/L)',  'CBR池B-DO (mg/L)']
     
     
+    morfi = MORFI(trX, data, yvars)
+    fi = morfi.fi('臭氧池-电耗 (kWh/kgO3)', n_features=20, verbose=False, traverse=1)
     
+    prc = process(trX, data)
+    print(prc.pools)
     
-    
-    
-    
-    
-    
-    
-    
+    crossPlot('二沉池混合后-TOC (mg/L)','高效澄清池-TOC (mg/L)' , trX, data)

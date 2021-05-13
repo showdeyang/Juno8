@@ -32,7 +32,8 @@ import pprint
 import datetime
 import pandas as pd
 # from statsmodels.tsa.ar_model import AutoReg
-from statsmodels.tsa.api import VAR
+from functools import reduce
+import itertools
 
 if not sys.warnoptions:
     warnings.simplefilter("ignore")
@@ -56,7 +57,10 @@ def about(verbose=True):
                        ('2.1.0', 'Added algo.about() function to display metadata about algo.pyd.'),
              ('2.1.1', 'knnRegress: n_points change from 2000 to 6000 to allow for 15 years of data. Bug will occur when n_points < n(days in data).'),
              ('2.1.2', 'pipe1 removed StandardScaler, LinearRegression added normalize=True. Performance increased by 2%.'),
-             ('2.1.3', 'efficacy added success-rate estimation loop break by tolerance. Performance increased by 5% ~ 50%.')]
+             ('2.1.3', 'efficacy added success-rate estimation loop break by tolerance. Performance increased by 5% ~ 50%.'),
+             ('2.2', 'Proposition Discovery Algorithm.'), 
+             ('2.2.1', 'fixed some small bugs in MORFI.'),
+             ('2.2.2', 'fixed typeDefs bug in MORFI.')]
          }
     d['release'] = str(datetime.datetime.now())
     d['version'] = d['changelog'][-1][0]
@@ -143,7 +147,7 @@ def knnRegress(X, n_points=6000, verbose=False):
     
     inX = trX[:, :, 1].T
 
-    imputer = KNNImputer( weights='distance' ) #,n_neighbors=n_points
+    imputer = KNNImputer(n_neighbors=100000) # weights='distance'
     xnew = imputer.fit_transform(inX)
     xnew = xnew.T
     
@@ -658,10 +662,17 @@ class process(object):
             d = None
         
         return d
+
+def taylor_series(A, power=20):
+    # matrices = [(1/math.factorial(exponent))*np.linalg.matrix_power(A, exponent) for exponent in range(power)]
+    matrices = [(1/math.factorial(exponent))*np.linalg.matrix_power(A, exponent) for exponent in range(1,power)]
+    res = reduce(np.add, matrices)
+    return res
+
     
 class MORFI(object):
     #MultiOutput Regressor-based Feature Importances
-    def __init__(self, trX, data):
+    def __init__(self, trX, data, yvars):
         t1 = time.time()
         self.features = list(data.keys())
         
@@ -690,41 +701,144 @@ class MORFI(object):
         coefs = np.array([pipe[-1].estimators_[i].coef_ / np.max(np.abs(pipe[-1].estimators_[i].coef_)) for i, fea in enumerate(self.features)])
         # coefs=None
         # coefs = np.array([pipe[-1].estimators_[i].feature_importances_ for i, fea in enumerate(features)])
-        print('firf time', time.time()-t1)
+        
+        # coefs = coefs**3 / np.sum(coefs**3,axis=1)
+        
+        coefs = np.nan_to_num(coefs)
+        # coefs[coefs > 0.5] = 1
+        
+        # coefs[coefs <= -0.5] = -1
+        
+        
+        coefsLower = np.tril(coefs)
+        coefsUpper = np.triu(coefs)
+        
+        # print(coefs.tolist())
+        # coefs = np.sum([np.linalg.matrix_power(coefs, i) for i in range(5)])
+        # coefs = 1 + coefs + 0.5* np.linalg.matrix_power(coefs, 2) + (1/6)* np.linalg.matrix_power(coefs, 3) +  (1/24)* np.linalg.matrix_power(coefs, 4) +  (1/120)* np.linalg.matrix_power(coefs, 5) +  (1/720)* np.linalg.matrix_power(coefs, 6)
+        
+        # coefs = taylor_series(coefs, power=100)
+        coefsForward =  taylor_series(coefsUpper, power=20)
+        coefsBackward =  taylor_series(coefsLower, power=20)
+        
+        print('morfi time', time.time()-t1)
         self.data = data
+        self.trX = trX
         self.X = inX
         self.Y = inY
         self.coefs = coefs
+        self.coefsLower = coefsLower
+        self.coefsUpper = coefsUpper 
+        self.coefsForward = coefsForward
+        self.coefsBackward = coefsBackward
+        
+        
         self.Ypred = res
         
         
-    def fi(self, var, n_features=None, verbose=False, proc=True):
+    def fi(self, var, n_features=None, verbose=False, traverse=0):
+        
+        if traverse == 0:
+            coefs = self.coefs
+        elif traverse > 0:
+            coefs = self.coefsForward
+        elif traverse < 0:
+            coefs = self.coefsBackward
+        else:
+            coefs = self.coefs
+        
         
         ind = var2ind(var, self.data)
+        # print("analyzing", var)
         
-        if proc:
-            prc = process(trX, data)
-            self.prc = prc
-            ds = list(map( lambda fea: self.prc.dist(var, fea),  self.features))
+        prc = process(self.trX, self.data)
+        self.prc = prc
+        ds = list(map( lambda fea: self.prc.dist(var, fea),  self.features))
+        orders = list(map(lambda fea: prc.order(fea), self.features))
+        s = list(zip(self.features, coefs[ind], ds, orders))
         
-            s = list(zip(self.features,self.coefs[ind], ds))
-        else:
-            s = list(zip(self.features,self.coefs[ind]))
-            
-        if proc:
-            prc = process(trX, data)
-            self.prc = prc
-            s = filter(lambda x: -3 <= x[2] <= 2 , sorted(s, key=lambda x: x[2]))
-            s = sorted(s, key=lambda x: np.abs(x[1]) , reverse=True)[:n_features]
-            
-        else:
-            s = sorted(s, key=lambda x: np.abs(x[1]) , reverse=True)[:n_features]
-            
-        
+        prc = process(self.trX, self.data)
+        self.prc = prc
+        # s = filter(lambda x: -3 <= x[2] <= 2 , sorted(s, key=lambda x: x[2]))
+        s = sorted(s, key=lambda x: np.abs(x[1]) , reverse=True)[:n_features]
         
         if verbose:
             pprint.pprint(s)
         return s    
+    
+    def y2z(self, yvar, yvars, n_features=20):
+        fi = self.fi(yvar, n_features=n_features, traverse=1)
+        fiz = list(filter(lambda x: x[0] not in yvars, fi))
+        return fiz
+    
+    def z2xy(self, zvar, yvar, yvars, n_features=2):
+        currentOrder = self.prc.order(yvar)
+        # print('currentOrder', currentOrder)
+        fi = self.fi(zvar, n_features=n_features, traverse=-1)
+        fi = list(filter(lambda x: x[3] < currentOrder, fi))
+        
+        fiy = list(filter(lambda x: x[0] in yvars, fi))
+        fix = list(filter(lambda x: x[0] not in yvars, fi))
+        
+        
+        return fix, fiy
+    
+    def Z2XY(self, fiz, yvar, yvars, n_features=2):
+        res = list(map( lambda fz: self.z2xy(fz[0], yvar=yvar, yvars=yvars, n_features=n_features), fiz))
+        
+        #merging fix and fiy
+        res = list(zip(*res))
+        x = [list(map(lambda row: row[0], case)) for case in res[0]]
+        y = [list(map(lambda row: row[0], case)) for case in res[1]]
+        
+        x = sorted(list(set(itertools.chain(*x))))
+        y = sorted(list(set(itertools.chain(*y))))
+        if yvar not in y:
+            y.append(yvar)
+        return x,y
+    
+    def xyz(self, yvar, yvars, verbose=False, nz=5, nxy=2):
+        fiz = self.y2z(yvar, yvars, n_features=nz*4)
+        x,y = self.Z2XY(fiz, yvar, yvars, n_features=nxy)
+        z = list(map(lambda fz: fz[0], fiz[:nz]))
+        for xv in x:
+            if '日期' in xv or 'ate' in xv.lower() or 'ime' in xv.lower():
+                x.remove(xv)
+                
+        if verbose:
+            print('x')
+            pprint.pprint(x)
+            print('y')
+            pprint.pprint(y)
+            print('z')
+            pprint.pprint(z)
+        
+        return x,y,z
+
+    def XYZ(self, yvars):
+        props = []
+        for yvar in yvars:
+            
+            x,y,z = self.xyz(yvar, yvars)
+            thresholds = []
+            for zvar in z:
+                threshold = {}
+                
+                threshold['q99%'] = np.percentile([v[1] for v in self.trX[var2ind(zvar, self.data)]], 70)
+                threshold['q80%'] = np.percentile([v[1] for v in self.trX[var2ind(zvar, self.data)]], 60)
+                thresholds.append(threshold)
+            
+            prop = {}
+            prop['name'] = '基于' + (',').join(y).replace('(mg/L)','').replace('（mg/L）','').strip() + '的命题'
+            prop['inputVars'] = x
+            prop['controlVars'] = y
+            prop['outputVars'] = z
+            prop['typeDefs'] = [-1]*len(x) + [1/len(y)]*len(y) + [2]*len(z)
+            prop['safety'] = 0.5
+            prop['thresholds'] = thresholds
+            
+            props.append(prop)
+        return props
         
 def crossPlot(varX, varY, trX, data):
     indX = var2ind(varX, data)
@@ -773,10 +887,14 @@ if __name__ == '__main__':
     # plt.show()
     # res, pcs = propPCA(trX, data, var=[])
     
-    morfi = MORFI(trX, data)
-    fi = morfi.fi('高效澄清池-粉炭(投加量) (mg/L)', n_features=200, verbose=True)
+    yvars = ['高效澄清池-PAC (kg/d)', '高效澄清池-PAM (kg/d)','臭氧池-臭氧产量 （kg/h）','臭氧池-功率 (kWh)' ,'高效澄清池-粉炭 (kg/d)','CBR池A-DO (mg/L)','活性污泥池A（ASR）-DO (mg/L)', '活性污泥池B（ASR）-DO (mg/L)',  'CBR池B-DO (mg/L)']
     
-    prc = process(trX, data)
-    print(prc.pools)
     
-    crossPlot('高效澄清池-粉炭(投加量) (mg/L)', '高效澄清池-TOC (mg/L)', trX, data)
+    morfi = MORFI(trX, data, yvars)
+    # fi = morfi.fi('臭氧池-电耗 (kWh/kgO3)', n_features=20, verbose=False, traverse=1)
+    
+    # prc = process(trX, data)
+    # print(prc.pools)
+    
+    # crossPlot('二沉池混合后-TOC (mg/L)','高效澄清池-TOC (mg/L)' , trX, data)
+    res = morfi.XYZ(yvars)
