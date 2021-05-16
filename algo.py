@@ -60,7 +60,8 @@ def about(verbose=True):
              ('2.1.3', 'efficacy added success-rate estimation loop break by tolerance. Performance increased by 5% ~ 50%.'),
              ('2.2', 'Proposition Discovery Algorithm.'), 
              ('2.2.1', 'fixed some small bugs in MORFI.'),
-             ('2.2.2', 'fixed typeDefs bug in MORFI.')]
+             ('2.2.2', 'fixed typeDefs bug in MORFI.'),
+             ('2.2.3', 'thresholds added str()')]
          }
     d['release'] = str(datetime.datetime.now())
     d['version'] = d['changelog'][-1][0]
@@ -824,8 +825,8 @@ class MORFI(object):
             for zvar in z:
                 threshold = {}
                 
-                threshold['q99%'] = np.percentile([v[1] for v in self.trX[var2ind(zvar, self.data)]], 70)
-                threshold['q80%'] = np.percentile([v[1] for v in self.trX[var2ind(zvar, self.data)]], 60)
+                threshold['q99%'] = str(round(np.percentile([v[1] for v in self.trX[var2ind(zvar, self.data)]], 70), 2))
+                threshold['q80%'] = str(round(np.percentile([v[1] for v in self.trX[var2ind(zvar, self.data)]], 60), 2))
                 thresholds.append(threshold)
             
             prop = {}

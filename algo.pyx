@@ -60,7 +60,8 @@ def about(verbose=True):
              ('2.1.3', 'efficacy added success-rate estimation loop break by tolerance. Performance increased by 5% ~ 50%.'),
              ('2.2', 'Proposition Discovery Algorithm.'), 
              ('2.2.1', 'fixed some small bugs in MORFI.'),
-             ('2.2.2', 'fixed typeDefs bug in MORFI.')]
+             ('2.2.2', 'fixed typeDefs bug in MORFI.'),
+             ('2.2.3', 'thresholds added str()')]
          }
     d['release'] = str(datetime.datetime.now())
     d['version'] = d['changelog'][-1][0]
@@ -824,8 +825,8 @@ class MORFI(object):
             for zvar in z:
                 threshold = {}
                 
-                threshold['q99%'] = np.percentile([v[1] for v in self.trX[var2ind(zvar, self.data)]], 70)
-                threshold['q80%'] = np.percentile([v[1] for v in self.trX[var2ind(zvar, self.data)]], 60)
+                threshold['q99%'] = str(round(np.percentile([v[1] for v in self.trX[var2ind(zvar, self.data)]], 70), 2))
+                threshold['q80%'] = str(round(np.percentile([v[1] for v in self.trX[var2ind(zvar, self.data)]], 60), 2))
                 thresholds.append(threshold)
             
             prop = {}
@@ -857,26 +858,26 @@ if __name__ == '__main__':
     plt.style.use('dark_background')
     data = readJsonData(path / 'JunoProject' / '示例项目' / 'value.json')
     
-    features = list(data.keys())
+    # features = list(data.keys())
     
-    inputVars = ['二沉池混合后-TP (mg/L)', '二沉池混合后-SS (mg/L)']
-    controlVars = ['高效澄清池-PAC(投加量) (mg/L)', '高效澄清池-PAM(投加量) (mg/L)']
-    outputVars = ['排放池-TP在线 (mg/L)', '高效澄清池-SS (mg/L)']
+    # inputVars = ['二沉池混合后-TP (mg/L)', '二沉池混合后-SS (mg/L)']
+    # controlVars = ['高效澄清池-PAC(投加量) (mg/L)', '高效澄清池-PAM(投加量) (mg/L)']
+    # outputVars = ['排放池-TP在线 (mg/L)', '高效澄清池-SS (mg/L)']
     
-    # inputVars = ['二沉池混合后-TOC (mg/L)', '缺氧池B（D-N）-NO3-N (mg/L)']
-    # controlVars = ['高效澄清池-粉炭(投加量) (mg/L)']
-    # outputVars = ['高效澄清池-TOC (mg/L)']
+    # # inputVars = ['二沉池混合后-TOC (mg/L)', '缺氧池B（D-N）-NO3-N (mg/L)']
+    # # controlVars = ['高效澄清池-粉炭(投加量) (mg/L)']
+    # # outputVars = ['高效澄清池-TOC (mg/L)']
     
-    typeDefs = [-1]*len(inputVars) + [1/len(controlVars)]*len(controlVars) + [2]*len(outputVars)
+    # typeDefs = [-1]*len(inputVars) + [1/len(controlVars)]*len(controlVars) + [2]*len(outputVars)
     
     
-    t1 = time.time()
+    # t1 = time.time()
     
-    thresholds = [{'q99%': 0.5}, {'q99%': 9, 'q80%': 7}]
-    A = analysis(data, inputVars, controlVars, outputVars, thresholds, typeDefs, safety=0.5, verbose=True)
-    print(A.risks)
-    print(A.consumptions)
-    print('time taken', time.time()-t1)
+    # thresholds = [{'q99%': 0.5}, {'q99%': 9, 'q80%': 7}]
+    # A = analysis(data, inputVars, controlVars, outputVars, thresholds, typeDefs, safety=0.5, verbose=True)
+    # print(A.risks)
+    # print(A.consumptions)
+    # print('time taken', time.time()-t1)
     
     ##########################
     # data = readJsonData('C:/Users/showd/code/Juno8/JunoProject/江宁化工/value.json')
@@ -891,9 +892,10 @@ if __name__ == '__main__':
     
     
     morfi = MORFI(trX, data, yvars)
-    fi = morfi.fi('臭氧池-电耗 (kWh/kgO3)', n_features=20, verbose=False, traverse=1)
+    # fi = morfi.fi('臭氧池-电耗 (kWh/kgO3)', n_features=20, verbose=False, traverse=1)
     
-    prc = process(trX, data)
-    print(prc.pools)
+    # prc = process(trX, data)
+    # print(prc.pools)
     
-    crossPlot('二沉池混合后-TOC (mg/L)','高效澄清池-TOC (mg/L)' , trX, data)
+    # crossPlot('二沉池混合后-TOC (mg/L)','高效澄清池-TOC (mg/L)' , trX, data)
+    res = morfi.XYZ(yvars)
