@@ -1,14 +1,14 @@
-from algo import *
+import algo
 from pprint import pprint
 
 if __name__ == '__main__':
-    data = readJsonData(path / 'JunoProject' / '示例项目' / 'value.json')
+    data = algo.readJsonData('JunoProject/港区/value.json')
 
-    trX = knnR(data, verbose=True)
+    trX = algo.knnR(data, verbose=True)
 
-    yvars = ['高效澄清池-PAC (kg/d)', '高效澄清池-PAM (kg/d)','臭氧池-臭氧产量 （kg/h）','臭氧池-功率 (kWh)' ,'高效澄清池-粉炭 (kg/d)','CBR池A-DO (mg/L)','活性污泥池A（ASR）-DO (mg/L)', '活性污泥池B（ASR）-DO (mg/L)',  'CBR池B-DO (mg/L)']
+    yvars = ['高效澄清池_PAC_(kg/d)', '高效澄清池_PAM_(kg/d)', '臭氧池_臭氧产量_(kg/h)', '臭氧池_功率_(kWh)', '高效澄清池_粉炭_(kg/d)', 'CBR池A_DO_(mg/L)', '活性污泥池A(ASR)_DO_(mg/L)', '活性污泥池B(ASR)_DO_(mg/L)',  'CBR池B_DO_(mg/L)']
         
         
-    morfi = MORFI(trX, data, yvars)
+    morfi = algo.MORFI(trX, data, yvars)
     xyz = morfi.XYZ(yvars)
     pprint(xyz)

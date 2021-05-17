@@ -15,8 +15,8 @@ import algo
 import qdarkstyle
 
 Version = 'Juno 2.1'
-if not os.path.isdir('./JunoProject'):
-    os.mkdir('./JunoProject')
+if not os.path.isdir('./JunoProject_old'):
+    os.mkdir('./JunoProject_old')
 if not os.path.isdir('./SourceTable'):
     os.mkdir('./SourceTable')
 
@@ -53,10 +53,10 @@ class JunoUI(object):
         self.load_project_table()
 
     def load_project_table(self):
-        project_list = os.listdir('./JunoProject')
+        project_list = os.listdir('./JunoProject_old')
         load_project_sort = {}
         for i in project_list:
-            time = os.path.getatime('./JunoProject/' + i)
+            time = os.path.getatime('./JunoProject_old/' + i)
             load_project_sort.update({i: time})
         load_project_sort = sorted(load_project_sort.items(), key=lambda item: item[1], reverse=True)
         count = 0
@@ -105,7 +105,7 @@ class JunoUI(object):
         juno.setCentralWidget(new_project_content)
 
     def input_change(self):
-        project_list = os.listdir('./JunoProject')
+        project_list = os.listdir('./JunoProject_old')
         if self.inputName.document().toRawText().strip() != '' and self.value_temp != {} and self.inputName.document().toRawText() not in project_list:
             self.yesButton.setDisabled(False)
         else:
@@ -114,13 +114,13 @@ class JunoUI(object):
     def new_project_yes(self, juno):
         project_name = self.inputName.document().toRawText()
         if 'win' in sys.platform:
-            os.system('mkdir ' + os.getcwd() + '\JunoProject' + '\\' + project_name)
-            os.system('mkdir ' + os.getcwd() + '\JunoProject' + '\\' + project_name + '\\' + 'Task')
-            os.system('copy ' + self.filename.replace('/', '\\') + ' ' + os.getcwd() + '\\' + 'JunoProject' + '\\' + project_name + '\\' + self.filename.split('/')[-1])
+            os.system('mkdir ' + os.getcwd() + '\JunoProject_old' + '\\' + project_name)
+            os.system('mkdir ' + os.getcwd() + '\JunoProject_old' + '\\' + project_name + '\\' + 'Task')
+            os.system('copy ' + self.filename.replace('/', '\\') + ' ' + os.getcwd() + '\\' + 'JunoProject_old' + '\\' + project_name + '\\' + self.filename.split('/')[-1])
         elif 'linux' in sys.platform:
             cmd = ''
 
-        with open('./JunoProject/' + project_name + '/value.json', 'w') as f:
+        with open('./JunoProject_old/' + project_name + '/value.json', 'w') as f:
             f.write(json.dumps(self.value_temp))
 
         # self.task_window(project_name, juno)
@@ -345,7 +345,7 @@ class JunoUI(object):
         task_layout.addWidget(self.task_table)
         task_layout.addWidget(flow_content)
 
-        with open('./JunoProject/' + project_name + '/value.json', 'r') as f:
+        with open('./JunoProject_old/' + project_name + '/value.json', 'r') as f:
             self.value = json.load(f)
 
         juno.setCentralWidget(task_content)
@@ -354,7 +354,7 @@ class JunoUI(object):
 
     def task_textedit_change(self, project_name):
         task_name = self.task_textedit.document().toRawText().strip()
-        task_list = os.listdir('./JunoProject/' + project_name + '/Task/')
+        task_list = os.listdir('./JunoProject_old/' + project_name + '/Task/')
         if task_name == '':
             self.submit_task_btn.setDisabled(True)
             return
@@ -366,16 +366,16 @@ class JunoUI(object):
     def task_submit(self, project_name):
         task_name = self.task_textedit.document().toRawText()
         var = {'situation': [], 'action': [], 'result': [], 'cost': {}, 'risk': {}, 'border': {}, 'begin': None, 'end': None, 'safety': "0.5"}
-        with open('./JunoProject/' + project_name + '/Task/' + task_name + '.json', 'w') as f:
+        with open('./JunoProject_old/' + project_name + '/Task/' + task_name + '.json', 'w') as f:
             f.write(json.dumps(var))
         self.task_textedit.clear()
         self.load_task_table(project_name)
 
     def load_task_table(self, project_name):
-        task_list = os.listdir('./JunoProject/' + project_name + '/Task/')
+        task_list = os.listdir('./JunoProject_old/' + project_name + '/Task/')
         load_task_sort = {}
         for i in task_list:
-            time = os.path.getatime('./JunoProject/' + project_name + '/Task/' + i)
+            time = os.path.getatime('./JunoProject_old/' + project_name + '/Task/' + i)
             load_task_sort.update({i: time})
         load_task_sort = sorted(load_task_sort.items(), key=lambda item: item[1], reverse=True)
         count = 0
@@ -547,7 +547,7 @@ class JunoUI(object):
         self.load_config_window(project_name, task_name)
 
     def load_config_window(self, project_name, task_name):
-        with open('./JunoProject/' + project_name + '/Task/' + task_name + '.json', 'r') as f:
+        with open('./JunoProject_old/' + project_name + '/Task/' + task_name + '.json', 'r') as f:
             self.config_data = json.load(f)
             self.situation_data = self.config_data['situation']         # 指向 json 指定部分内容的指针
             self.action_data = self.config_data['action']               # 指向 json 指定部分内容的指针
@@ -978,7 +978,7 @@ class JunoUI(object):
         self.config_data.update({'end': End_datestamp})
         self.config_data.update({'safety': safety})
 
-        with open('./JunoProject/' + project_name + '/Task/' + task_name + '.json', 'w') as f:
+        with open('./JunoProject_old/' + project_name + '/Task/' + task_name + '.json', 'w') as f:
             f.write(json.dumps(self.config_data))
 
         print(self.config_data)
@@ -1815,9 +1815,9 @@ class JunoUI(object):
         self.table9.resizeColumnsToContents()
 
     def export_to_excel(self, project_name, task_name, result):
-        str = "./JunoProject/" + project_name + "/Output/"
-        str_image_1 = "./JunoProject/" + project_name + "/Output/Image/人机策略分布"
-        str_image_2 = "./JunoProject/" + project_name + "/Output/Image/两色散点图"
+        str = "./JunoProject_old/" + project_name + "/Output/"
+        str_image_1 = "./JunoProject_old/" + project_name + "/Output/Image/人机策略分布"
+        str_image_2 = "./JunoProject_old/" + project_name + "/Output/Image/两色散点图"
         if not os.path.isdir(str):
             os.makedirs(str)
         if not os.path.isdir(str_image_1):
@@ -1831,7 +1831,7 @@ class JunoUI(object):
         for i in self.graph1_combo_value:
             self.graph1_combo.setCurrentText(i)
             self.graph1_combo_change(result)
-            a = 'JunoProject/' + project_name + '/Output/Image/两色散点图/' + i.replace(' ', '').replace('/', '') +'.png'
+            a = 'JunoProject_old/' + project_name + '/Output/Image/两色散点图/' + i.replace(' ', '').replace('/', '') +'.png'
             pyqtgraph.exporters.ImageExporter(self.plt1).export(fileName=a)
         for i in self.graph2_combo_value:
             for j in self.graph2_combo_value:
@@ -1839,7 +1839,7 @@ class JunoUI(object):
                     self.graph2_combo_x.setCurrentText(i)
                     self.graph2_combo_y.setCurrentText(j)
                     self.graph2_combo_change(result)
-                    a = 'JunoProject/' + project_name + '/Output/Image/人机策略分布/' + i.replace(' ', '').replace('/', '').split('(')[0] + '&' + j.replace(' ', '').replace('/', '').split('(')[0] +'.png'
+                    a = 'JunoProject_old/' + project_name + '/Output/Image/人机策略分布/' + i.replace(' ', '').replace('/', '').split('(')[0] + '&' + j.replace(' ', '').replace('/', '').split('(')[0] +'.png'
                     pyqtgraph.exporters.ImageExporter(self.graph2.plotItem).export(fileName=a)
         self.graph1_combo.setCurrentText(current_graph1_combo)
         self.graph1_combo_change(result)
