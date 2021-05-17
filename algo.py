@@ -313,7 +313,7 @@ def strategy(trX, thresholds=None, typeDefs=None, safety=1):
     
     t2 = time.time()
     
-    THR = np.array([[[float(thresh.replace('q', '').replace("%", ''))/100, threshold[thresh]] for thresh in threshold] for threshold in thresholds], dtype=object)
+    THR = np.array([[[float(thresh.replace('q', '').replace("%", ''))/100, float(threshold[thresh])] for thresh in threshold] for threshold in thresholds], dtype=object)
 
     X1 = []
     Y1 = []
@@ -399,7 +399,7 @@ def efficacy(trX, strat, T, thresholds, typeDefs=None, startIndex=0, endIndex=No
     xin = np.c_[X.T, decisions]
     predZ = T(xin)
     
-    THR = np.array([[[float(thresh.replace('q', '').replace("%", ''))/100, threshold[thresh]] for thresh in threshold] for threshold in thresholds], dtype=object)
+    THR = np.array([[[float(thresh.replace('q', '').replace("%", ''))/100, float(threshold[thresh])] for thresh in threshold] for threshold in thresholds], dtype=object)
     
     consumptions = []
     for i, y in enumerate(Y):
@@ -850,13 +850,19 @@ def crossPlot(varX, varY, trX, data):
     plt.xlabel(varX)
     plt.ylabel(varY)
     
-        
+def detectYvars(trX, data):
+    features = list(data.keys())
+    diff = np.diff(trX[:,:,1])
+    
+    
+    
+    return diff
 
 
 
 if __name__ == '__main__':
     plt.style.use('dark_background')
-    data = readJsonData(path / 'JunoProject' / '示例项目' / 'value.json')
+    data = readJsonData(path / 'JunoProject_old' / '示例项目' / 'value.json')
     
     # features = list(data.keys())
     
@@ -899,3 +905,7 @@ if __name__ == '__main__':
     
     # crossPlot('二沉池混合后-TOC (mg/L)','高效澄清池-TOC (mg/L)' , trX, data)
     res = morfi.XYZ(yvars)
+    
+    As = [analysis(data, r['inputVars'], r['controlVars'], r['outputVars'], r['thresholds'], r['typeDefs'], safety=r['safety'], verbose=True) for r in res]
+    
+    
