@@ -61,7 +61,11 @@ def about(verbose=True):
              ('2.2', 'Proposition Discovery Algorithm.'), 
              ('2.2.1', 'fixed some small bugs in MORFI.'),
              ('2.2.2', 'fixed typeDefs bug in MORFI.'),
-             ('2.2.3', 'thresholds added str()')]
+             ('2.2.3', 'thresholds added str().'),
+             ('2.3.0', 'now can auto-detect yvars.'),
+             ('2.3.0.1', 'kNN-imputer uses weights=distance.'),
+             ('2.3.0.2', 'knnR added weights=True, but uses weights=False in detectYvars.'),
+             ('2.3.0.3', 'fixed some knnR bugs regarding weights and detectYvars.')]
          }
     d['release'] = str(datetime.datetime.now())
     d['version'] = d['changelog'][-1][0]
@@ -121,7 +125,7 @@ def syncX(X, Ts):
     
     return trX
 
-def knnRegress(X, n_points=6000, verbose=False):
+def knnRegress(X, n_points=6000, verbose=False, weights=False):
     # print(len(X))
     t1 = time.time()
     T = []
@@ -130,6 +134,7 @@ def knnRegress(X, n_points=6000, verbose=False):
         T += [r[0] for r in x]
     # print(T)
     # T = list(set(T))
+    
     minT = math.floor(min(T))
     maxT = math.ceil(max(T))
     # print('maxT', maxT)
@@ -147,8 +152,11 @@ def knnRegress(X, n_points=6000, verbose=False):
     trX = np.array(trX)
     
     inX = trX[:, :, 1].T
-
-    imputer = KNNImputer(n_neighbors=100000) # weights='distance'
+    
+    if weights:
+        imputer = KNNImputer(n_neighbors=100000, weights='distance') # weights='distance'
+    else:
+        imputer = KNNImputer(n_neighbors=100000) # weights='distance'
     xnew = imputer.fit_transform(inX)
     xnew = xnew.T
     
@@ -313,7 +321,7 @@ def strategy(trX, thresholds=None, typeDefs=None, safety=1):
     
     t2 = time.time()
     
-    THR = np.array([[[float(thresh.replace('q', '').replace("%", ''))/100, threshold[thresh]] for thresh in threshold] for threshold in thresholds], dtype=object)
+    THR = np.array([[[float(thresh.replace('q', '').replace("%", ''))/100, float(threshold[thresh])] for thresh in threshold] for threshold in thresholds], dtype=object)
 
     X1 = []
     Y1 = []
@@ -322,7 +330,7 @@ def strategy(trX, thresholds=None, typeDefs=None, safety=1):
         return np.matmul(Y_var/np.mean(Y, axis=0), typeDefs[yinds])
     
     def R(Z_var):
-        return np.matmul(np.array([[np.max([THR[j][i][0]*np.clip(z[j] - THR[j][i][1], 0, np.inf) for i, thresh in enumerate(threshold)]) for j, threshold in enumerate(thresholds)] for z in Z_var]) / np.mean(Z, axis=0), typeDefs[zinds])
+        return np.matmul(np.array([[np.max([THR[j][i][0]*np.clip(z[j] - THR[j][i][1], 0, np.inf) for i, thresh in enumerate(threshold)]) for j, threshold in enumerate(thresholds)] for z in Z_var]) / (np.mean(Z, axis=0)+0.0000001), typeDefs[zinds])
     
     # xys = [[*(X[i]), *y] for i, y in enumerate(Y)]
     xys = np.c_[X,Y]
@@ -362,7 +370,14 @@ def strategy(trX, thresholds=None, typeDefs=None, safety=1):
     pipe2 = Pipeline([('scaler', BarebonesStandardScaler()), ('knn', KNeighborsRegressor())])
     
     # strat = [RandomForestRegressor(n_estimators=30).fit(X1, y) for y in Y1.T]
+    
+    print('X', X1.tolist())
+    print('Y', Y1.tolist())
+    
     pipe2.fit(X1, Y1)
+    
+
+    
     S = lambda x: pipe2.predict(x)
     
     t5 = time.time()
@@ -399,7 +414,7 @@ def efficacy(trX, strat, T, thresholds, typeDefs=None, startIndex=0, endIndex=No
     xin = np.c_[X.T, decisions]
     predZ = T(xin)
     
-    THR = np.array([[[float(thresh.replace('q', '').replace("%", ''))/100, threshold[thresh]] for thresh in threshold] for threshold in thresholds], dtype=object)
+    THR = np.array([[[float(thresh.replace('q', '').replace("%", ''))/100, float(threshold[thresh])] for thresh in threshold] for threshold in thresholds], dtype=object)
     
     consumptions = []
     for i, y in enumerate(Y):
@@ -481,10 +496,10 @@ def efficacy(trX, strat, T, thresholds, typeDefs=None, startIndex=0, endIndex=No
     
     return decisions, predZ, consumptions, risks
 
-def knnR(data, time_dimension=True, verbose=False):
+def knnR(data, time_dimension=True, verbose=False, weights=False):
     t1 = time.time()
     print('Regressing data... This may take a while...')
-    trX = knnRegress([data[feature] for feature in  data], verbose=verbose)
+    trX = knnRegress([data[feature] for feature in  data], verbose=verbose, weights=weights)
     
     if not time_dimension:
         trX = trX[:,:, 1]
@@ -834,7 +849,7 @@ class MORFI(object):
             prop['inputVars'] = x
             prop['controlVars'] = y
             prop['outputVars'] = z
-            prop['typeDefs'] = [-1]*len(x) + [1/len(y)]*len(y) + [2]*len(z)
+            prop['typeDefs'] = [-1.0]*len(x) + [float(1/len(y))]*len(y) + [2.0]*len(z)
             prop['safety'] = 0.5
             prop['thresholds'] = thresholds
             
@@ -850,13 +865,44 @@ def crossPlot(varX, varY, trX, data):
     plt.xlabel(varX)
     plt.ylabel(varY)
     
-        
+def detectYvars(data, prob=False):
+    trX = knnR(data, weights=True)
+    features = list(data.keys())
+    diff = np.diff(trX[:,:,1])
+    
+    diff[diff>0] = 1
+    diff[diff==0] = 0
+    diff[diff<0] = 1
+    
+    ps = 1-np.sum(diff, axis=-1)/diff.shape[-1]
+    
+    pyvs = list(zip(features, ps))
+    
+    pyvs = sorted(pyvs, key=lambda x: x[1], reverse=True)
+    
+    result = []
+    for pyv in pyvs:
+        c = 0
+        for chars in ['排放','色度', '%', 'SS', '出水', '差', 'mg/L']:
+            if chars in pyv[0]:
+                c += 1
+        if c==0:
+            result.append(pyv)
+    
+    result = list(filter(lambda x: 1 > x[1]>=0.05, result))
+    
+    if prob:
+        return result
+    else:
+        return list(list(zip(*result))[0])
+    
+    
 
 
 
 if __name__ == '__main__':
     plt.style.use('dark_background')
-    data = readJsonData(path / 'JunoProject' / '示例项目' / 'value.json')
+    data = readJsonData(path / 'JunoProject_old' / '示例项目' / 'value.json')
     
     # features = list(data.keys())
     
@@ -888,9 +934,10 @@ if __name__ == '__main__':
     # plt.show()
     # res, pcs = propPCA(trX, data, var=[])
     
-    yvars = ['高效澄清池-PAC (kg/d)', '高效澄清池-PAM (kg/d)','臭氧池-臭氧产量 （kg/h）','臭氧池-功率 (kWh)' ,'高效澄清池-粉炭 (kg/d)','CBR池A-DO (mg/L)','活性污泥池A（ASR）-DO (mg/L)', '活性污泥池B（ASR）-DO (mg/L)',  'CBR池B-DO (mg/L)']
+    # yvars = ['高效澄清池-PAC (kg/d)', '高效澄清池-PAM (kg/d)','臭氧池-臭氧产量 （kg/h）','臭氧池-功率 (kWh)' ,'高效澄清池-粉炭 (kg/d)','CBR池A-DO (mg/L)','活性污泥池A（ASR）-DO (mg/L)', '活性污泥池B（ASR）-DO (mg/L)',  'CBR池B-DO (mg/L)']
     
-    
+    yvars = detectYvars(data)
+    print(yvars)
     morfi = MORFI(trX, data, yvars)
     # fi = morfi.fi('臭氧池-电耗 (kWh/kgO3)', n_features=20, verbose=False, traverse=1)
     
@@ -899,3 +946,8 @@ if __name__ == '__main__':
     
     # crossPlot('二沉池混合后-TOC (mg/L)','高效澄清池-TOC (mg/L)' , trX, data)
     res = morfi.XYZ(yvars)
+    
+    As = [analysis(data, r['inputVars'], r['controlVars'], r['outputVars'], r['thresholds'], r['typeDefs'], safety=r['safety'], verbose=True) for r in res]
+    
+    # pyvs = detectYvars(trX,data)
+    
