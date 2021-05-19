@@ -20,6 +20,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.svm import SVR
 from sklearn.decomposition import PCA, KernelPCA, SparsePCA
 import warnings
+from typing import List
 # from numba import jit
 # from multiprocessing import Pool
 from sklearn.impute import KNNImputer
@@ -66,7 +67,10 @@ def about(verbose=True):
              ('2.3.0.1', 'kNN-imputer uses weights=distance.'),
              ('2.3.0.2', 'knnR added weights=True, but uses weights=False in detectYvars.'),
              ('2.3.0.3', 'fixed some knnR bugs regarding weights and detectYvars.'),
-             ('2.3.0.3.1', 'remove duplicate xvar and zvar.')]
+             ('2.3.0.3.1', 'remove duplicate xvar and zvar.'),
+             ('2.3.0.3.2', 'remove duplicate boundary for q99 and q80.'),
+             ('2.3.0.3.3', 'localLoss added protection against NaN.'),
+             ('2.3.0.3.4', 'typeDefs bug fixed.')]
          }
     d['release'] = str(datetime.datetime.now())
     d['version'] = d['changelog'][-1][0]
@@ -297,6 +301,8 @@ def strategy(trX, thresholds=None, typeDefs=None, safety=1):
         return
     
     t0 = time.time()
+    typeDefs = [float(td) for td in typeDefs]
+    safety = float(safety)
     
     typeDefs = np.array(typeDefs)
     xinds = [i for i, td in enumerate(typeDefs) if td < 0]
@@ -354,9 +360,9 @@ def strategy(trX, thresholds=None, typeDefs=None, safety=1):
     def localLoss(x):
         # xin = [[*x, *y] for i, y in enumerate(Y)]
         xin = np.c_[np.repeat([x], Y.shape[0], axis=0),Y] #biggest improvement here
-        ll = lossModel.predict(xin) + 1*np.sum(np.abs(x-X)/np.mean(X, axis=0), axis=1)
-        ll = np.power(ll,10)
-        p = (1/ll)/np.sum(1/ll)
+        ll = lossModel.predict(xin) + 1*np.sum(np.abs(x-X)/(np.mean(X, axis=0) + 1e-2), axis=1)
+        ll = np.power(ll,5) + 1e-2
+        p = (1/ll)/(np.sum(1/ll) + 1e-2)
         policy = np.matmul(p, Y)
         return policy
     
@@ -368,7 +374,7 @@ def strategy(trX, thresholds=None, typeDefs=None, safety=1):
     
     X1,Y1 = np.array(X[rinds]), np.array(Y1)
     # print(Y1[:20])
-    pipe2 = Pipeline([('scaler', BarebonesStandardScaler()), ('knn', KNeighborsRegressor())])
+    pipe2 = Pipeline([('scaler', StandardScaler()), ('knn', KNeighborsRegressor())])
     
     # strat = [RandomForestRegressor(n_estimators=30).fit(X1, y) for y in Y1.T]
     
@@ -515,6 +521,10 @@ def knnR(data, time_dimension=True, verbose=False, weights=False):
 class analysis:
     def __init__(self, data, inputVars, controlVars, outputVars, thresholds, typeDefs=None, safety=0.7, startIndex=None, endIndex=None, verbose=True):
         # startIndex 和 endIndex 必须都要为负数
+        
+        typeDefs = [float(td) for td in typeDefs]
+        safety = float(safety)
+        
         print('ELAPSE TIME BREAKDOWN')
         t1 = time.time()
         xinds = [i for i, td in enumerate(typeDefs) if td < 0]
@@ -845,8 +855,14 @@ class MORFI(object):
             for zvar in z:
                 threshold = {}
                 ind =  var2ind(zvar, self.data)
-                threshold['q99%'] = str(np.percentile(self.trX[ind, :, 1], 70))
-                threshold['q80%'] = str(np.percentile(self.trX[ind, :, 1], 50))
+                
+                th1 = round(np.percentile(self.trX[ind, :, 1], 70), 2)
+                th2 = round(np.percentile(self.trX[ind, :, 1], 50), 2)
+                
+                threshold['q99%'] = str(th1)
+                
+                if th1 - th2 > 0.01:
+                    threshold['q80%'] = str(th2)
                 thresholds.append(threshold)
             
             prop = {}
@@ -854,8 +870,22 @@ class MORFI(object):
             prop['inputVars'] = x
             prop['controlVars'] = y
             prop['outputVars'] = z
-            prop['typeDefs'] = [-1]*len(x) + [float(1/len(y))]*len(y) + [2]*len(z)
-            prop['safety'] = 0.5
+            
+            # td = [-1]*len(x) + [1/len(y)]*len(y) + [2]*len(z)
+            
+            td : List[float] 
+            td = []
+            for v in x:
+                td.append(-1)
+            for v in y:
+                td.append(1/float(len(y)))
+            for v in z:
+                td.append(2)
+            
+            # td = [str(v) for v in td]
+            
+            prop['typeDefs'] = td
+            prop['safety'] = str(0.5)
             prop['thresholds'] = thresholds
             
             props.append(prop)
