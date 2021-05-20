@@ -70,7 +70,8 @@ def about(verbose=True):
              ('2.3.0.3.1', 'remove duplicate xvar and zvar.'),
              ('2.3.0.3.2', 'remove duplicate boundary for q99 and q80.'),
              ('2.3.0.3.3', 'localLoss added protection against NaN.'),
-             ('2.3.0.3.4', 'typeDefs bug fixed.')]
+             ('2.3.0.3.4', 'typeDefs bug fixed.'),
+             ('2.3.0.4', 'added support fo DO detection in detectYvars.')]
          }
     d['release'] = str(datetime.datetime.now())
     d['version'] = d['changelog'][-1][0]
@@ -873,7 +874,7 @@ class MORFI(object):
             
             # td = [-1]*len(x) + [1/len(y)]*len(y) + [2]*len(z)
             
-            td : List[float]
+            td : List[float] 
             td = []
             for v in x:
                 td.append(-1)
@@ -895,7 +896,7 @@ def crossPlot(varX, varY, trX, data):
     indX = var2ind(varX, data)
     indY = var2ind(varY, data)
     x = trX[indX,:,1]
-    y = trX[indY,:,1]       
+    y = trX[indY,:,1]
     plt.scatter(x,y, s=5)
     plt.xlabel(varX)
     plt.ylabel(varY)
@@ -926,12 +927,14 @@ def detectYvars(data, prob=False):
     
     result = list(filter(lambda x: 1 > x[1]>=0.05, result))
     
+    result += list(filter(lambda x: 'DO' in x[0] or 'do' in x[0], pyvs ))
+    
     if prob:
         return result
     else:
         return list(list(zip(*result))[0])
     
-    
+
 
 
 
