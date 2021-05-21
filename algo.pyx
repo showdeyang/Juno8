@@ -35,6 +35,7 @@ import pandas as pd
 # from statsmodels.tsa.ar_model import AutoReg
 from functools import reduce
 import itertools
+import re
 
 if not sys.warnoptions:
     warnings.simplefilter("ignore")
@@ -71,7 +72,8 @@ def about(verbose=True):
              ('2.3.0.3.2', 'remove duplicate boundary for q99 and q80.'),
              ('2.3.0.3.3', 'localLoss added protection against NaN.'),
              ('2.3.0.3.4', 'typeDefs bug fixed.'),
-             ('2.3.0.4', 'added support fo DO detection in detectYvars.')]
+             ('2.3.0.4', 'added support for DO detection in detectYvars.'),
+             ('2.3.0.5', 'proposition name removes units.')]
          }
     d['release'] = str(datetime.datetime.now())
     d['version'] = d['changelog'][-1][0]
@@ -866,8 +868,11 @@ class MORFI(object):
                     threshold['q80%'] = str(th2)
                 thresholds.append(threshold)
             
+            name = '基于' + (',').join(y).replace('(mg/L)','').replace('（mg/L）','').strip() + '的命题'
+            name = re.sub(r"\(.*?\)",'', name)
+            
             prop = {}
-            prop['name'] = '基于' + (',').join(y).replace('(mg/L)','').replace('（mg/L）','').strip() + '的命题'
+            prop['name'] = name
             prop['inputVars'] = x
             prop['controlVars'] = y
             prop['outputVars'] = z
