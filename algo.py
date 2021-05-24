@@ -837,6 +837,20 @@ class MORFI(object):
             if zvar in x:
                 z.remove(zvar)
         
+        # for ar in [x,y,z]:
+        #     for xv in ar:
+        #         if 'Q' in xv:
+        #             print('Q detected')
+        #             ar.remove(xv)
+        # print(x)
+        # x = list(filter(lambda v: 'Q' not in v[0], x))
+        # y = list(filter(lambda v: 'Q' not in v[0], y))
+        # z = list(filter(lambda v: 'Q' not in v[0], z))
+        
+        x = [v for v in x if 'Q' not in v]
+        y = [v for v in y if 'Q' not in v]
+        z = [v for v in z if 'Q' not in v]
+        
         if verbose:
             print('x')
             pprint.pprint(x)
@@ -919,7 +933,7 @@ def detectYvars(data, prob=False):
     result = []
     for pyv in pyvs:
         c = 0
-        for chars in ['排放','色度', '%', 'SS', '出水', '差', 'mg/L']:
+        for chars in ['排放','色度', '%', 'SS', '出水', '差', 'mg/L', 'Q', 'T', '电耗']:
             if chars in pyv[0]:
                 c += 1
         if c==0:
