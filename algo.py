@@ -73,7 +73,10 @@ def about(verbose=True):
              ('2.3.0.3.3', 'localLoss added protection against NaN.'),
              ('2.3.0.3.4', 'typeDefs bug fixed.'),
              ('2.3.0.4', 'added support for DO detection in detectYvars.'),
-             ('2.3.0.5', 'proposition name removes units.')]
+             ('2.3.0.5', 'proposition name removes units.'),
+             ('2.4.0', 'added global proposition.'),
+             ('2.4.1', 'refined xyz variables selection criteria in propositions.'),
+             ('2.4.1.1', 'sorted xyz based on process order in global proposition.')]
          }
     d['release'] = str(datetime.datetime.now())
     d['version'] = d['changelog'][-1][0]
@@ -849,9 +852,16 @@ class MORFI(object):
         # y = list(filter(lambda v: 'Q' not in v[0], y))
         # z = list(filter(lambda v: 'Q' not in v[0], z))
         
-        x = [v for v in x if 'Q' not in v]
-        y = [v for v in y if 'Q' not in v]
-        z = [v for v in z if 'Q' not in v]
+        def filterOutByString(x,y,z,string):
+            x = [v for v in x if string not in v]
+            y = [v for v in y if string not in v]
+            z = [v for v in z if string not in v]
+            return x,y,z
+        
+        x,y,z = filterOutByString(x, y, z, 'Q')
+        x,y,z = filterOutByString(x, y, z, '%')
+        
+        
         
         if verbose:
             print('x')
@@ -915,11 +925,23 @@ class MORFI(object):
         ys = list(set().union(*[prop['controlVars'] for prop in props]))
         zs = list(set().union(*[prop['outputVars'] for prop in props]))
         
-        
+        # for zvar in zs:
+        #     if zvar in xs:
+        #         z.remove(zvar)
         
         # xs = list(set(xs))
         # ys = list(set(ys))
         # zs = list(set(zs))
+        
+        xs = list(zip(xs, map(self.prc.order, xs)))
+        xs = [v[0] for v in sorted(xs, key=lambda v: v[1])]
+        
+        ys = list(zip(ys, map(self.prc.order, ys)))
+        ys = [v[0] for v in sorted(ys, key=lambda v: v[1])]
+        
+        zs = list(zip(zs, map(self.prc.order, zs)))
+        zs = [v[0] for v in sorted(zs, key=lambda v: v[1])]
+        # print('XS', xs)
         
         prop = {}
         prop['name'] = '全局命题'
@@ -929,13 +951,14 @@ class MORFI(object):
         
         # td = [-1]*len(x) + [1/len(y)]*len(y) + [2]*len(z)
         
+        
         td : List[float] 
         td = []
-        for v in x:
+        for v in xs:
             td.append(-1)
-        for v in y:
+        for v in ys:
             td.append(1/float(len(y)))
-        for v in z:
+        for v in zs:
             td.append(2)
         
         # td = [str(v) for v in td]
@@ -1058,7 +1081,7 @@ if __name__ == '__main__':
     # crossPlot('二沉池混合后-TOC (mg/L)','高效澄清池-TOC (mg/L)' , trX, data)
     res = morfi.XYZ(yvars)
     
-    # As = [analysis(data, r['inputVars'], r['controlVars'], r['outputVars'], r['thresholds'], r['typeDefs'], safety=r['safety'], verbose=True) for r in res]
+    As = [analysis(data, r['inputVars'], r['controlVars'], r['outputVars'], r['thresholds'], r['typeDefs'], safety=r['safety'], verbose=True) for r in res]
     
     # pyvs = detectYvars(trX,data)
     

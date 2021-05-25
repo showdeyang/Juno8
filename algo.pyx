@@ -73,7 +73,10 @@ def about(verbose=True):
              ('2.3.0.3.3', 'localLoss added protection against NaN.'),
              ('2.3.0.3.4', 'typeDefs bug fixed.'),
              ('2.3.0.4', 'added support for DO detection in detectYvars.'),
-             ('2.3.0.5', 'proposition name removes units.')]
+             ('2.3.0.5', 'proposition name removes units.'),
+             ('2.4.0', 'added global proposition.'),
+             ('2.4.1', 'refined xyz variables selection criteria in propositions.'),
+             ('2.4.1.1', 'sorted xyz based on process order in global proposition.')]
          }
     d['release'] = str(datetime.datetime.now())
     d['version'] = d['changelog'][-1][0]
@@ -839,6 +842,27 @@ class MORFI(object):
             if zvar in x:
                 z.remove(zvar)
         
+        # for ar in [x,y,z]:
+        #     for xv in ar:
+        #         if 'Q' in xv:
+        #             print('Q detected')
+        #             ar.remove(xv)
+        # print(x)
+        # x = list(filter(lambda v: 'Q' not in v[0], x))
+        # y = list(filter(lambda v: 'Q' not in v[0], y))
+        # z = list(filter(lambda v: 'Q' not in v[0], z))
+        
+        def filterOutByString(x,y,z,string):
+            x = [v for v in x if string not in v]
+            y = [v for v in y if string not in v]
+            z = [v for v in z if string not in v]
+            return x,y,z
+        
+        x,y,z = filterOutByString(x, y, z, 'Q')
+        x,y,z = filterOutByString(x, y, z, '%')
+        
+        
+        
         if verbose:
             print('x')
             pprint.pprint(x)
@@ -895,7 +919,74 @@ class MORFI(object):
             prop['thresholds'] = thresholds
             
             props.append(prop)
+            
+        #global proposition
+        xs = list(set().union(*[prop['inputVars'] for prop in props]))
+        ys = list(set().union(*[prop['controlVars'] for prop in props]))
+        zs = list(set().union(*[prop['outputVars'] for prop in props]))
+        
+        # for zvar in zs:
+        #     if zvar in xs:
+        #         z.remove(zvar)
+        
+        # xs = list(set(xs))
+        # ys = list(set(ys))
+        # zs = list(set(zs))
+        
+        xs = list(zip(xs, map(self.prc.order, xs)))
+        xs = [v[0] for v in sorted(xs, key=lambda v: v[1])]
+        
+        ys = list(zip(ys, map(self.prc.order, ys)))
+        ys = [v[0] for v in sorted(ys, key=lambda v: v[1])]
+        
+        zs = list(zip(zs, map(self.prc.order, zs)))
+        zs = [v[0] for v in sorted(zs, key=lambda v: v[1])]
+        # print('XS', xs)
+        
+        prop = {}
+        prop['name'] = '全局命题'
+        prop['inputVars'] = xs
+        prop['controlVars'] = ys
+        prop['outputVars'] = zs
+        
+        # td = [-1]*len(x) + [1/len(y)]*len(y) + [2]*len(z)
+        
+        
+        td : List[float] 
+        td = []
+        for v in xs:
+            td.append(-1)
+        for v in ys:
+            td.append(1/float(len(y)))
+        for v in zs:
+            td.append(2)
+        
+        # td = [str(v) for v in td]
+        
+        prop['typeDefs'] = td
+        prop['safety'] = str(0.5)
+        
+        thresholds = []
+        for zvar in zs:
+            threshold = {}
+            ind =  var2ind(zvar, self.data)
+            
+            th1 = round(np.percentile(self.trX[ind, :, 1], 70), 2)
+            th2 = round(np.percentile(self.trX[ind, :, 1], 50), 2)
+            
+            threshold['q99%'] = str(th1)
+            
+            if th1 - th2 > 0.01:
+                threshold['q80%'] = str(th2)
+            thresholds.append(threshold)
+                
+        prop['thresholds'] = thresholds
+        
+        props.append(prop) 
+    
+        
         return props
+
         
 def crossPlot(varX, varY, trX, data):
     indX = var2ind(varX, data)
@@ -924,7 +1015,7 @@ def detectYvars(data, prob=False):
     result = []
     for pyv in pyvs:
         c = 0
-        for chars in ['排放','色度', '%', 'SS', '出水', '差', 'mg/L']:
+        for chars in ['排放','色度', '%', 'SS', '出水', '差', 'mg/L', 'Q', 'T', '电耗']:
             if chars in pyv[0]:
                 c += 1
         if c==0:
