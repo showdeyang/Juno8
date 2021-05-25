@@ -909,7 +909,61 @@ class MORFI(object):
             prop['thresholds'] = thresholds
             
             props.append(prop)
+            
+        #global proposition
+        xs = list(set().union(*[prop['inputVars'] for prop in props]))
+        ys = list(set().union(*[prop['controlVars'] for prop in props]))
+        zs = list(set().union(*[prop['outputVars'] for prop in props]))
+        
+        
+        
+        # xs = list(set(xs))
+        # ys = list(set(ys))
+        # zs = list(set(zs))
+        
+        prop = {}
+        prop['name'] = '全局命题'
+        prop['inputVars'] = xs
+        prop['controlVars'] = ys
+        prop['outputVars'] = zs
+        
+        # td = [-1]*len(x) + [1/len(y)]*len(y) + [2]*len(z)
+        
+        td : List[float] 
+        td = []
+        for v in x:
+            td.append(-1)
+        for v in y:
+            td.append(1/float(len(y)))
+        for v in z:
+            td.append(2)
+        
+        # td = [str(v) for v in td]
+        
+        prop['typeDefs'] = td
+        prop['safety'] = str(0.5)
+        
+        thresholds = []
+        for zvar in zs:
+            threshold = {}
+            ind =  var2ind(zvar, self.data)
+            
+            th1 = round(np.percentile(self.trX[ind, :, 1], 70), 2)
+            th2 = round(np.percentile(self.trX[ind, :, 1], 50), 2)
+            
+            threshold['q99%'] = str(th1)
+            
+            if th1 - th2 > 0.01:
+                threshold['q80%'] = str(th2)
+            thresholds.append(threshold)
+                
+        prop['thresholds'] = thresholds
+        
+        props.append(prop) 
+    
+        
         return props
+
         
 def crossPlot(varX, varY, trX, data):
     indX = var2ind(varX, data)
@@ -1004,7 +1058,7 @@ if __name__ == '__main__':
     # crossPlot('二沉池混合后-TOC (mg/L)','高效澄清池-TOC (mg/L)' , trX, data)
     res = morfi.XYZ(yvars)
     
-    As = [analysis(data, r['inputVars'], r['controlVars'], r['outputVars'], r['thresholds'], r['typeDefs'], safety=r['safety'], verbose=True) for r in res]
+    # As = [analysis(data, r['inputVars'], r['controlVars'], r['outputVars'], r['thresholds'], r['typeDefs'], safety=r['safety'], verbose=True) for r in res]
     
     # pyvs = detectYvars(trX,data)
     
