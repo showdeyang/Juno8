@@ -76,7 +76,9 @@ def about(verbose=True):
              ('2.3.0.5', 'proposition name removes units.'),
              ('2.4.0', 'added global proposition.'),
              ('2.4.1', 'refined xyz variables selection criteria in propositions.'),
-             ('2.4.1.1', 'sorted xyz based on process order in global proposition.')]
+             ('2.4.1.1', 'sorted xyz based on process order in global proposition.'),
+             ('2.4.1.2', 'fixed typeDefs scaling and shifting in Analysis and Morfi props.'),
+             ('2.4.1.3', 'safety changed to around 0.1~0.3')]
          }
     d['release'] = str(datetime.datetime.now())
     d['version'] = d['changelog'][-1][0]
@@ -316,6 +318,8 @@ def strategy(trX, thresholds=None, typeDefs=None, safety=1):
     xyinds = [i for i, td in enumerate(typeDefs) if td < 2] 
     zinds = [i for i, td in enumerate(typeDefs) if td >= 2]
     
+    
+    
     X = trX[xinds, :, 1].T
     Y = trX[yinds, :, 1].T
     XY = trX[xyinds, :, 1].T
@@ -343,7 +347,7 @@ def strategy(trX, thresholds=None, typeDefs=None, safety=1):
         return np.matmul(Y_var/np.mean(Y, axis=0), typeDefs[yinds])
     
     def R(Z_var):
-        return np.matmul(np.array([[np.max([THR[j][i][0]*np.clip(z[j] - THR[j][i][1], 0, np.inf) for i, thresh in enumerate(threshold)]) for j, threshold in enumerate(thresholds)] for z in Z_var]) / (np.mean(Z, axis=0)+0.0000001), typeDefs[zinds])
+        return np.matmul(np.array([[np.max([THR[j][i][0]*np.clip(z[j] - THR[j][i][1], 0, np.inf) for i, thresh in enumerate(threshold)]) for j, threshold in enumerate(thresholds)] for z in Z_var]) / (np.mean(Z, axis=0)+0.0000001), typeDefs[zinds]-2)
     
     # xys = [[*(X[i]), *y] for i, y in enumerate(Y)]
     xys = np.c_[X,Y]
@@ -910,7 +914,7 @@ class MORFI(object):
             for v in y:
                 td.append(1/float(len(y)))
             for v in z:
-                td.append(2)
+                td.append(2 + 1/float(len(z)))
             
             # td = [str(v) for v in td]
             
@@ -957,14 +961,14 @@ class MORFI(object):
         for v in xs:
             td.append(-1)
         for v in ys:
-            td.append(1/float(len(y)))
+            td.append(1/float(len(ys)))
         for v in zs:
-            td.append(2)
+            td.append(2 + 1/float(len(zs)))
         
         # td = [str(v) for v in td]
         
         prop['typeDefs'] = td
-        prop['safety'] = str(0.5)
+        prop['safety'] = str(0.15)
         
         thresholds = []
         for zvar in zs:

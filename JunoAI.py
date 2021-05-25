@@ -3032,7 +3032,7 @@ if __name__ == '__main__':
     print(algo.about())
     # QApplication.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling)
     app = QApplication(sys.argv)
-    # app.setStyleSheet(qdarkstyle.load_stylesheet(qt_api='pyqt5'))
+    app.setStyleSheet(qdarkstyle.load_stylesheet(qt_api='pyqt5'))
     current_screen_width = app.desktop().screenGeometry().width()
     current_screen_height = app.desktop().screenGeometry().height()
     MainWindow = QMainWindow()
