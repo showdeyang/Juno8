@@ -78,7 +78,10 @@ def about(verbose=True):
              ('2.4.1', 'refined xyz variables selection criteria in propositions.'),
              ('2.4.1.1', 'sorted xyz based on process order in global proposition.'),
              ('2.4.1.2', 'fixed typeDefs scaling and shifting in Analysis and Morfi props.'),
-             ('2.4.1.3', 'safety changed to around 0.1~0.3')]
+             ('2.4.1.3', 'safety changed to around 0.1~0.3'),
+             ('2.4.1.4', 'typeDefs for z now depends on process order and type of feature (pollutants / resources / rates type).'),
+             ('2.4.1.5', 'typeDefs for y now depends on variance of yvars.'),
+             ('2.4.1.6.', 'typeDefs for y bug fixed for temperature.')]
          }
     d['release'] = str(datetime.datetime.now())
     d['version'] = d['changelog'][-1][0]
@@ -388,8 +391,8 @@ def strategy(trX, thresholds=None, typeDefs=None, safety=1):
     
     # strat = [RandomForestRegressor(n_estimators=30).fit(X1, y) for y in Y1.T]
     
-    print('X', X1.tolist())
-    print('Y', Y1.tolist())
+    # print('X', X1.tolist())
+    # print('Y', Y1.tolist())
     
     pipe2.fit(X1, Y1)
     
@@ -531,7 +534,12 @@ def knnR(data, time_dimension=True, verbose=False, weights=False):
 class analysis:
     def __init__(self, data, inputVars, controlVars, outputVars, thresholds, typeDefs=None, safety=0.7, startIndex=None, endIndex=None, verbose=True):
         # startIndex 和 endIndex 必须都要为负数
-        
+        print('xvar', inputVars)
+        print('yvar', controlVars)
+        print('zvar', outputVars)
+        print('typeDefs', typeDefs)
+        print('safety', safety)
+        print('thresholds', thresholds)
         typeDefs = [float(td) for td in typeDefs]
         safety = float(safety)
         
@@ -802,6 +810,7 @@ class MORFI(object):
         if verbose:
             pprint.pprint(s)
         return s    
+
     
     def y2z(self, yvar, yvars, n_features=20):
         fi = self.fi(yvar, n_features=n_features, traverse=1)
@@ -911,10 +920,35 @@ class MORFI(object):
             td = []
             for v in x:
                 td.append(-1)
+                
+            # print(self.trX.shape)
+            stds = np.std(self.trX[:,:,1], axis=1)
+            stds /= np.mean(self.trX[:,:,1], axis=1)
+            ystds = []
             for v in y:
-                td.append(1/float(len(y)))
-            for v in z:
-                td.append(2 + 1/float(len(z)))
+                i = var2ind(v, self.data)
+                ystds.append(stds[i])
+            ystds = np.array(ystds)
+            yfactors = ystds  / np.sum(ystds)
+            
+                
+            for factor in yfactors:
+                td.append(factor)
+                
+            orders = np.array([self.prc.order(v) for v in z])/10.0
+            prefs1 = np.array(['r' not in v for v in z])
+            prefs2 = np.array(['差' not in v for v in z])
+            prefs3 = np.array(['HRT' not in v for v in z])
+            prefs4 = np.array(['效果' not in v for v in z])
+            prefs5 = np.array(['pH' not in v for v in z])
+            prefs6 = np.array(['℃' not in v for v in z])
+            orders *= prefs1 *prefs2 * prefs3 * prefs4 * prefs5 *prefs6
+            zfactors = orders**6 / np.sum(orders**6)
+
+            for factor in zfactors:
+                # order = self.prc.order(v)
+                
+                td.append(2 + factor)
             
             # td = [str(v) for v in td]
             
@@ -960,10 +994,37 @@ class MORFI(object):
         td = []
         for v in xs:
             td.append(-1)
+            
+        stds = np.std(self.trX[:,:,1], axis=1)
+        stds /= np.mean(self.trX[:,:,1], axis=1)
+        ystds = []
         for v in ys:
-            td.append(1/float(len(ys)))
-        for v in zs:
-            td.append(2 + 1/float(len(zs)))
+            i = var2ind(v, self.data)
+            ystds.append(stds[i])
+        ystds = np.array(ystds)
+ 
+        yfactors = ystds / np.sum(ystds)
+        
+            
+        for factor in yfactors:
+            td.append(factor)
+        # for v in ys:
+        #     td.append(1/float(len(ys)))
+            
+        orders = np.array([self.prc.order(v) for v in zs])/10.0
+        prefs1 = np.array(['r' not in v for v in zs])
+        prefs2 = np.array(['差' not in v for v in zs])
+        prefs3 = np.array(['HRT' not in v for v in zs])
+        prefs4 = np.array(['效果' not in v for v in zs])
+        prefs5 = np.array(['pH' not in v for v in zs])
+        prefs6 = np.array(['℃' not in v for v in zs])
+        orders *= prefs1 *prefs2 * prefs3 * prefs4 * prefs5 *prefs6
+        zfactors = orders**6 / np.sum(orders**6)
+
+        for factor in zfactors:
+            # order = self.prc.order(v)
+            
+            td.append(2 + factor)
         
         # td = [str(v) for v in td]
         
