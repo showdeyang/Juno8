@@ -284,7 +284,7 @@ class JunoUI(object):
         main_btn_layout.addWidget(main_back_login_btn)
         if self.role == '0':
             main_btn_layout.addWidget(new_project_btn)
-
+        
         main_content = QWidget()
         main_content.setMinimumSize(width, height)
         main_layout = QVBoxLayout(main_content)
