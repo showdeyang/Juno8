@@ -82,7 +82,8 @@ def about(verbose=True):
              ('2.4.1.4', 'typeDefs for z now depends on process order and type of feature (pollutants / resources / rates type).'),
              ('2.4.1.5', 'typeDefs for y now depends on variance of yvars.'),
              ('2.4.1.6.', 'typeDefs for y bug fixed for temperature.'),
-             ('2.4.1.7', 'remove duplicate z and x in global props.')]
+             ('2.4.1.7', 'remove duplicate z and x in global props.'),
+             ('2.4.1.7.1', 'typo in 2.4.1.7.')]
          }
     d['release'] = str(datetime.datetime.now())
     d['version'] = d['changelog'][-1][0]
@@ -966,7 +967,7 @@ class MORFI(object):
         
         for zvar in zs:
             if zvar in xs:
-                z.remove(zvar)
+                zs.remove(zvar)
         
         # xs = list(set(xs))
         # ys = list(set(ys))
