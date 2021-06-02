@@ -632,7 +632,7 @@ class analysis:
 
 
 
-def propPCA(trX, data, var=None, n_components=None):
+def propPCA(trX, data, var=None, n_components=None, threshold1=90, threshold2=95):
     t1 = time.time()
     features = list(data.keys())
     # ind = var2ind(var, data)
@@ -642,11 +642,11 @@ def propPCA(trX, data, var=None, n_components=None):
     pca = pipe[1]
     vrs = pca.explained_variance_ratio_ #85 most important principle components such that sum(vrs) > 0.95
     
-    thr = np.percentile(vrs, 95)
+    thr = np.percentile(vrs, threshold1)
     c = len(vrs[vrs>=thr])
     print('components', c)
     pcs = np.abs(pca.components_)[:c] #principle components
-    thresh = np.percentile(pcs, 95)
+    thresh = np.percentile(pcs, threshold2)
     res = []
     
     for pc in pcs:
@@ -1146,9 +1146,29 @@ if __name__ == '__main__':
     # print(prc.pools)
     
     # crossPlot('二沉池混合后-TOC (mg/L)','高效澄清池-TOC (mg/L)' , trX, data)
-    res = morfi.XYZ(yvars)
+    # res = morfi.XYZ(yvars)
     
-    As = [analysis(data, r['inputVars'], r['controlVars'], r['outputVars'], r['thresholds'], r['typeDefs'], safety=r['safety'], verbose=True) for r in res]
+    # As = [analysis(data, r['inputVars'], r['controlVars'], r['outputVars'], r['thresholds'], r['typeDefs'], safety=r['safety'], verbose=True) for r in res]
     
     # pyvs = detectYvars(trX,data)
     
+    pca = propPCA(trX, data, threshold1=30, threshold2=96)[0]
+    
+    import xlsxwriter
+
+    workbook = xlsxwriter.Workbook('pca_features.xlsx')
+    worksheet = workbook.add_worksheet('原输入指标')
+    
+    features = list(data.keys())
+    
+    # worksheet.write_row(0, 1, my_list)
+    worksheet.write_column(0, 0, features)
+    
+    worksheet = workbook.add_worksheet('机器自动抽取特征')
+    
+    for j, p in enumerate(pca):
+        
+        worksheet.write_column(0, 2*j, ['特征' + str(j+1)] + [v[0] for v in p])
+        worksheet.write_column(0, 2*j+1, ['特征' + str(j+1) + '组分影响力'] + [v[1] for v in p])
+    
+    workbook.close()
