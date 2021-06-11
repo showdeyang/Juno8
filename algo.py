@@ -1097,7 +1097,8 @@ def detectYvars(data, prob=False):
     else:
         return list(list(zip(*result))[0])
     
-
+def forecast(trX, data):
+    
 
 
 
@@ -1153,22 +1154,3 @@ if __name__ == '__main__':
     # pyvs = detectYvars(trX,data)
     
     pca = propPCA(trX, data, threshold1=30, threshold2=96)[0]
-    
-    import xlsxwriter
-
-    workbook = xlsxwriter.Workbook('pca_features.xlsx')
-    worksheet = workbook.add_worksheet('原输入指标')
-    
-    features = list(data.keys())
-    
-    # worksheet.write_row(0, 1, my_list)
-    worksheet.write_column(0, 0, features)
-    
-    worksheet = workbook.add_worksheet('机器自动抽取特征')
-    
-    for j, p in enumerate(pca):
-        
-        worksheet.write_column(0, 2*j, ['特征' + str(j+1)] + [v[0] for v in p])
-        worksheet.write_column(0, 2*j+1, ['特征' + str(j+1) + '组分影响力'] + [v[1] for v in p])
-    
-    workbook.close()
